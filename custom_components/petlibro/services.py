@@ -32,6 +32,12 @@ SERVICE_SCHEMA_FEED_AND_SKIP = vol.Schema({
 
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Set up PetLibro services."""
+
+    # Check if services are already registered (to handle multiple config entries)
+    if hass.services.has_service(DOMAIN, SERVICE_MANUAL_FEED):
+        _LOGGER.debug("PetLibro services already registered, skipping")
+        return
+
     _LOGGER.info("Setting up PetLibro services")
 
     async def handle_manual_feed(call: ServiceCall) -> None:
