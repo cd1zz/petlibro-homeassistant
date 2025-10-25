@@ -32,6 +32,7 @@ SERVICE_SCHEMA_FEED_AND_SKIP = vol.Schema({
 
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Set up PetLibro services."""
+    _LOGGER.info("Setting up PetLibro services")
 
     async def handle_manual_feed(call: ServiceCall) -> None:
         """Handle manual feed service call."""
@@ -83,6 +84,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         handle_manual_feed,
         schema=SERVICE_SCHEMA_MANUAL_FEED,
     )
+    _LOGGER.info(f"Registered service: {DOMAIN}.{SERVICE_MANUAL_FEED}")
 
     hass.services.async_register(
         DOMAIN,
@@ -90,3 +92,5 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         handle_feed_and_skip,
         schema=SERVICE_SCHEMA_FEED_AND_SKIP,
     )
+    _LOGGER.info(f"Registered service: {DOMAIN}.{SERVICE_FEED_AND_SKIP}")
+    _LOGGER.info("All PetLibro services registered")

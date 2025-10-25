@@ -26,9 +26,15 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the PetLibro component."""
-    # Register services once globally
-    from .services import async_setup_services
-    await async_setup_services(hass)
+    _LOGGER.info("PetLibro async_setup called - registering services")
+    try:
+        # Register services once globally
+        from .services import async_setup_services
+        await async_setup_services(hass)
+        _LOGGER.info("PetLibro services registered successfully")
+    except Exception as err:
+        _LOGGER.error(f"Error registering PetLibro services: {err}", exc_info=True)
+        return False
     return True
 
 
