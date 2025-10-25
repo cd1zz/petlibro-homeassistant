@@ -2,13 +2,13 @@
   "domain": "petlibro",
   "name": "PETLIBRO",
   "codeowners": [
-    "@jjjonesjr33"
+    "@cd1zz"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/jjjonesjr33/petlibro",
+  "documentation": "https://github.com/cd1zz/petlibro-homeassistant",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/jjjonesjr33/petlibro/issues",
+  "issue_tracker": "https://github.com/cd1zz/petlibro-homeassistant/issues",
   "loggers": ["petlibro"],
-  "version": "1.2.30"
+  "version": "1.2.30-custom-services"
 }
