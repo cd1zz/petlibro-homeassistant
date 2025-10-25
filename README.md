@@ -1,11 +1,11 @@
-[![version](https://img.shields.io/github/manifest-json/v/jjjonesjr33/petlibro?filename=custom_components%2Fpetlibro%2Fmanifest.json&color=slateblue)](https://github.com/jjjonesjr33/petlibro/releases)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/jjjonesjr33/petlibro)
+[![version](https://img.shields.io/github/manifest-json/v/cd1zz/petlibro-homeassistant?filename=custom_components%2Fpetlibro%2Fmanifest.json&color=slateblue)](https://github.com/cd1zz/petlibro-homeassistant/releases)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/cd1zz/petlibro-homeassistant)
 [![Community Forum](https://img.shields.io/static/v1.svg?label=Community&message=Forum&color=41bdf5&logo=HomeAssistant&logoColor=white)](https://community.home-assistant.io/t/petlibro-cloud-integration-non-tuya-wip/759978)
 [![Become a Sponsor](https://img.shields.io/badge/Become%20a%20Sponsor-❤️-black)](https://github.com/sponsors/jjjonesjr33)
 [![Sponsors](https://img.shields.io/github/sponsors/jjjonesjr33?label=Sponsors)](https://github.com/sponsors/jjjonesjr33)
 ![Logo](https://raw.githubusercontent.com/jjjonesjr33/ha_petlibro/master/docs/media/logo.png)
-> [!IMPORTANT]  
-> Before setting up the integration in Home Assistant, be sure to review the [Account Management](https://github.com/jjjonesjr33/petlibro/wiki/PetLibro-Account-Management) and [Password Limitations](https://github.com/jjjonesjr33/petlibro/wiki/PetLibro-Password-Limitation) sections in the wiki. This will help ensure a smooth and successful setup process.
+> [!IMPORTANT]
+> Before setting up the integration in Home Assistant, be sure to review the [Account Management](https://github.com/cd1zz/petlibro-homeassistant/wiki/PetLibro-Account-Management) and [Password Limitations](https://github.com/cd1zz/petlibro-homeassistant/wiki/PetLibro-Password-Limitation) sections in the wiki. This will help ensure a smooth and successful setup process.
 
 # PETLIBRO integration for Home Assistant
 
@@ -41,12 +41,12 @@
 
 ### Some Devices / May or may not work as intended
 
-* If you have a device that you would like added please issue a [request](https://github.com/jjjonesjr33/petlibro/issues/new/choose).
+* If you have a device that you would like added please issue a [request](https://github.com/cd1zz/petlibro-homeassistant/issues/new/choose).
 
 # Have questions, or need support?
 > [!TIP]
->* Most answers can be found in our [Wiki](https://github.com/jjjonesjr33/petlibro/wiki)
-> and if they can't, try the [Discussions](https://github.com/jjjonesjr33/petlibro/discussions)
+>* Most answers can be found in our [Wiki](https://github.com/cd1zz/petlibro-homeassistant/wiki)
+> and if they can't, try the [Discussions](https://github.com/cd1zz/petlibro-homeassistant/discussions)
 >* Or get ahold of me via direct message on [Discord](https://discord.com/invite/3hkWMry) - `Jamie Jones Jr` / `jjjonesjr33` previously  `JJJonesJr33#0001`
 
 #### Also if you want to check out all the other things I do follow me on my [**Socials**](https://jjjonesjr33.com/).
@@ -83,7 +83,7 @@ Get the folder `custom_components/petlibro` in your HA `config/custom_components
 
 
 ### Via [HACS](https://hacs.xyz/)
-<a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=jjjonesjr33&repository=petlibro&category=integration" target="_blank"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open your Home Assistant instance and open a repository inside the Home Assistant Community Store." /></a>
+<a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=cd1zz&repository=petlibro-homeassistant&category=integration" target="_blank"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open your Home Assistant instance and open a repository inside the Home Assistant Community Store." /></a>
 
 ## Configuration
 <a href="https://my.home-assistant.io/redirect/config_flow_start/?domain=petlibro" target="_blank"><img src="https://my.home-assistant.io/badges/config_flow_start.svg" alt="Open your Home Assistant instance and start setting up a new integration." /></a>
@@ -96,4 +96,4 @@ Get the folder `custom_components/petlibro` in your HA `config/custom_components
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=jjjonesjr33/petlibro&type=Date&theme=dark)](https://www.star-history.com/#jjjonesjr33/petlibro&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=cd1zz/petlibro-homeassistant&type=Date&theme=dark)](https://www.star-history.com/#cd1zz/petlibro-homeassistant&Date)
