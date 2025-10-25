@@ -73,13 +73,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     if device.serial == device_id or device.name == device_id:
                         _LOGGER.info(f"Manual feeding {portions} portions and skipping next meal for device {device.name}")
 
-                        # Import here to avoid circular import
-                        from .devices.feeders.feeder import Feeder
-
-                        if isinstance(device, Feeder):
+                        # Check if device has the manual_feed_and_skip_next method
+                        if hasattr(device, 'manual_feed_and_skip_next'):
                             await device.manual_feed_and_skip_next(portions)
                         else:
-                            _LOGGER.error(f"Device {device_id} is not a feeder")
+                            _LOGGER.error(f"Device {device_id} does not support feed and skip functionality")
                         return
 
         _LOGGER.error(f"Device {device_id} not found")
