@@ -1,2 +1,15 @@
 venv/
 .venv/
+
+# Test scripts and API enumeration
+test-scripts/
+*.pyc
+__pycache__/
+
+# IDE files
+.vscode/
+.idea/
+
+# Local test outputs
+api_enumeration_*.json
+api_test_results_*.json

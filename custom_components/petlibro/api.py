@@ -546,6 +546,37 @@ class PetLibroAPI:
             "enable": enable
         })
 
+    async def set_device_feeding_plan(self, serial: str, enable: bool):
+        """Alias for set_feeding_plan for compatibility."""
+        await self.set_feeding_plan(serial, enable)
+
+    async def set_device_feeding_plan_today_all(self, serial: str, skip: bool):
+        """
+        Skip or unskip all feeding plans for today.
+        Note: The actual API endpoint for this is not available.
+        This is a placeholder that should be implemented when the API is discovered.
+        """
+        # This endpoint doesn't exist in the API yet
+        # For now, we can only enable/disable the entire feeding plan
+        pass
+
+    async def set_device_manual_feeding(self, serial: str, feed_value: int = 1):
+        """Trigger manual feeding for a specific device (alias for compatibility)."""
+        await self.set_manual_feed(serial, feed_value)
+
+    async def set_feeding_plan_enable(self, serial: str, plan_id: int, enable: bool):
+        """Enable or disable a specific feeding plan."""
+        await self.session.post("/device/feedingPlan/enable", json={
+            "deviceSn": serial,
+            "planId": plan_id,
+            "enable": enable
+        })
+
+    async def get_feeding_plans(self, serial: str) -> list:
+        """Get list of feeding plans for a device."""
+        response = await self.session.post_serial("/device/feedingPlan/list", serial)
+        return response if isinstance(response, list) else []
+
     async def set_child_lock(self, serial: str, enable: bool):
         """Enable or disable the child lock functionality."""
         try:

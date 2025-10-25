@@ -1,7 +1,10 @@
 """Generic PETLIBRO feeder"""
 from typing import Optional, cast
+from logging import getLogger
 from . import Device
 from ..device import Device
+
+_LOGGER = getLogger(__name__)
 
 
 UNITS = {
@@ -60,6 +63,56 @@ class Feeder(Device):
 
     async def set_manual_feed(self):
         await self.api.set_device_manual_feeding(self.serial)
+        await self.refresh()
+
+    async def set_manual_feed_amount(self, amount: int = None):
+        """Trigger manual feeding with specific amount"""
+        # If no amount provided, try to get from device attributes or default
+        if amount is None:
+            amount = self._data.get("default_portion_size", 1)
+        await self.api.set_manual_feed(self.serial, amount)
+        await self.refresh()
+
+    async def manual_feed_and_skip_next(self, amount: int = None):
+        """Feed specified amount and disable the next scheduled feeding for today"""
+        from datetime import datetime
+
+        # If no amount provided, try to get from device attributes or default
+        if amount is None:
+            amount = self._data.get("default_portion_size", 1)
+
+        # First, dispense the food
+        await self.api.set_manual_feed(self.serial, amount)
+
+        # Get the feeding plans
+        plans = await self.api.get_feeding_plans(self.serial)
+
+        if plans:
+            # Get current time in 24-hour format
+            now = datetime.now()
+            current_time = now.strftime("%H:%M")
+
+            # Find the next scheduled feeding that's enabled
+            next_feeding = None
+            for plan in sorted(plans, key=lambda p: p.get('executionTime', '')):
+                if plan.get('enable', False) and plan.get('executionTime', '') > current_time:
+                    next_feeding = plan
+                    break
+
+            # If no feeding found for today, check from beginning (for tomorrow)
+            if not next_feeding:
+                for plan in sorted(plans, key=lambda p: p.get('executionTime', '')):
+                    if plan.get('enable', False):
+                        next_feeding = plan
+                        break
+
+            # Disable the next feeding
+            if next_feeding:
+                plan_id = next_feeding.get('id')
+                if plan_id:
+                    await self.api.set_feeding_plan_enable(self.serial, plan_id, False)
+                    _LOGGER.info(f"Disabled next feeding at {next_feeding.get('executionTime')} (ID: {plan_id})")
+
         await self.refresh()
 
     def convert_unit(self, value: int) -> int:

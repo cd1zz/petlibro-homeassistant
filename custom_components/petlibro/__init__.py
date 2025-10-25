@@ -182,6 +182,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Forward entry setups for each platform
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+        # Register services
+        from .services import async_setup_services
+        await async_setup_services(hass)
+
         _LOGGER.info(f"Successfully set up PetLibro integration for {email}")
         return True
 
