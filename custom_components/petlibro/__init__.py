@@ -24,6 +24,14 @@ from .hub import PetLibroHub
 _LOGGER = logging.getLogger(__name__)
 
 
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the PetLibro component."""
+    # Register services once globally
+    from .services import async_setup_services
+    await async_setup_services(hass)
+    return True
+
+
 # Define the platforms for each device type
 PLATFORMS_BY_TYPE = {
     Feeder: (
@@ -181,10 +189,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         # Forward entry setups for each platform
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-        # Register services
-        from .services import async_setup_services
-        await async_setup_services(hass)
 
         _LOGGER.info(f"Successfully set up PetLibro integration for {email}")
         return True
