@@ -572,6 +572,14 @@ class PetLibroAPI:
             "enable": enable
         })
 
+    async def set_feeding_plan_enable_today_single(self, serial: str, plan_id: int, enable: bool):
+        """Enable or disable a specific feeding plan for today only."""
+        await self.session.post("/device/feedingPlan/enableTodaySingle", json={
+            "deviceSn": serial,
+            "planId": plan_id,
+            "enable": enable
+        })
+
     async def get_feeding_plans(self, serial: str) -> list:
         """Get list of feeding plans for a device."""
         response = await self.session.post_serial("/device/feedingPlan/list", serial)

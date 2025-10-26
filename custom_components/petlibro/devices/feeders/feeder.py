@@ -74,7 +74,7 @@ class Feeder(Device):
         await self.refresh()
 
     async def manual_feed_and_skip_next(self, amount: int = None):
-        """Feed specified amount and disable the next scheduled feeding for today"""
+        """Feed specified amount and skip the next scheduled feeding for today"""
         from datetime import datetime
 
         # If no amount provided, try to get from device attributes or default
@@ -84,34 +84,30 @@ class Feeder(Device):
         # First, dispense the food
         await self.api.set_manual_feed(self.serial, amount)
 
-        # Get the feeding plans
-        plans = await self.api.get_feeding_plans(self.serial)
+        # Get today's feeding plans
+        today_plans_data = await self.api.device_feeding_plan_today_new(self.serial)
 
-        if plans:
+        if today_plans_data and 'plans' in today_plans_data:
+            plans = today_plans_data['plans']
+
             # Get current time in 24-hour format
             now = datetime.now()
             current_time = now.strftime("%H:%M")
 
-            # Find the next scheduled feeding that's enabled
+            # Find the next scheduled feeding (state == 1 and time > current_time)
             next_feeding = None
-            for plan in sorted(plans, key=lambda p: p.get('executionTime', '')):
-                if plan.get('enable', False) and plan.get('executionTime', '') > current_time:
+            for plan in sorted(plans, key=lambda p: p.get('time', '')):
+                # State 1 = SCHEDULED (toggled on)
+                if plan.get('state') == 1 and plan.get('time', '') > current_time:
                     next_feeding = plan
                     break
 
-            # If no feeding found for today, check from beginning (for tomorrow)
-            if not next_feeding:
-                for plan in sorted(plans, key=lambda p: p.get('executionTime', '')):
-                    if plan.get('enable', False):
-                        next_feeding = plan
-                        break
-
-            # Disable the next feeding
+            # Skip the next feeding for today only
             if next_feeding:
-                plan_id = next_feeding.get('id')
+                plan_id = next_feeding.get('planId')
                 if plan_id:
-                    await self.api.set_feeding_plan_enable(self.serial, plan_id, False)
-                    _LOGGER.info(f"Disabled next feeding at {next_feeding.get('executionTime')} (ID: {plan_id})")
+                    await self.api.set_feeding_plan_enable_today_single(self.serial, plan_id, False)
+                    _LOGGER.info(f"Skipped next feeding at {next_feeding.get('time')} (ID: {plan_id})")
 
         await self.refresh()
 
