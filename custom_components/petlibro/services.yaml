@@ -21,27 +21,3 @@ manual_feed:
           max: 12
           step: 1
           mode: slider
-
-feed_and_skip_next:
-  name: Feed and Skip Next Meal
-  description: Dispense portions and disable the next scheduled feeding
-  fields:
-    device_id:
-      name: Device
-      description: The feeder device (use serial number or device name)
-      required: true
-      example: "AF03013C4D813911A"
-      selector:
-        text:
-    portions:
-      name: Portions
-      description: Number of portions to dispense (1-12)
-      required: true
-      default: 1
-      example: 11
-      selector:
-        number:
-          min: 1
-          max: 12
-          step: 1
-          mode: slider

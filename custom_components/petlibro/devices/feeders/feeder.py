@@ -111,11 +111,11 @@ class Feeder(Device):
 
         await self.refresh()
 
-    async def skip_next_feeding(self):
-        """Skip the next scheduled feeding for today only (without dispensing food)"""
+    async def disable_next_feeding(self):
+        """Disable the next scheduled feeding for today only (without dispensing food)"""
         from datetime import datetime
 
-        _LOGGER.info(f"Skipping next feeding for {self.serial} (no food dispensed)")
+        _LOGGER.info(f"Disabling next scheduled feeding for {self.serial} (no food dispensed)")
 
         # Get today's feeding plans
         today_plans_data = await self.api.device_feeding_plan_today_new(self.serial)
@@ -135,14 +135,49 @@ class Feeder(Device):
                     next_feeding = plan
                     break
 
-            # Skip the next feeding for today only
+            # Disable the next feeding for today only
             if next_feeding:
                 plan_id = next_feeding.get('planId')
                 if plan_id:
                     await self.api.set_feeding_plan_enable_today_single(self.serial, plan_id, False)
-                    _LOGGER.info(f"Skipped next feeding at {next_feeding.get('time')} (ID: {plan_id}) FOR TODAY ONLY")
+                    _LOGGER.info(f"Disabled next feeding at {next_feeding.get('time')} (ID: {plan_id}) FOR TODAY ONLY")
             else:
-                _LOGGER.warning(f"No upcoming feeding found to skip for {self.serial}")
+                _LOGGER.warning(f"No upcoming feeding found to disable for {self.serial}")
+
+        await self.refresh()
+
+    async def enable_next_feeding(self):
+        """Enable/re-enable the next scheduled feeding for today (undo a skip)"""
+        from datetime import datetime
+
+        _LOGGER.info(f"Enabling next scheduled feeding for {self.serial}")
+
+        # Get today's feeding plans
+        today_plans_data = await self.api.device_feeding_plan_today_new(self.serial)
+
+        if today_plans_data and 'plans' in today_plans_data:
+            plans = today_plans_data['plans']
+
+            # Get current time in 24-hour format
+            now = datetime.now()
+            current_time = now.strftime("%H:%M")
+
+            # Find the next disabled feeding (state != 1 and time > current_time)
+            next_disabled = None
+            for plan in sorted(plans, key=lambda p: p.get('time', '')):
+                # State != 1 means disabled/skipped
+                if plan.get('state') != 1 and plan.get('time', '') > current_time:
+                    next_disabled = plan
+                    break
+
+            # Enable the next disabled feeding for today only
+            if next_disabled:
+                plan_id = next_disabled.get('planId')
+                if plan_id:
+                    await self.api.set_feeding_plan_enable_today_single(self.serial, plan_id, True)
+                    _LOGGER.info(f"Enabled next feeding at {next_disabled.get('time')} (ID: {plan_id}) FOR TODAY")
+            else:
+                _LOGGER.warning(f"No upcoming disabled feeding found to enable for {self.serial}")
 
         await self.refresh()
 

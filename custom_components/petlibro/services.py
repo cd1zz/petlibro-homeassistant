@@ -14,16 +14,8 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 SERVICE_MANUAL_FEED = "manual_feed"
-SERVICE_FEED_AND_SKIP = "feed_and_skip_next"
 
 SERVICE_SCHEMA_MANUAL_FEED = vol.Schema({
-    vol.Required("device_id"): cv.string,
-    vol.Required("portions", default=1): vol.All(
-        vol.Coerce(int), vol.Range(min=1, max=12)
-    ),
-})
-
-SERVICE_SCHEMA_FEED_AND_SKIP = vol.Schema({
     vol.Required("device_id"): cv.string,
     vol.Required("portions", default=1): vol.All(
         vol.Coerce(int), vol.Range(min=1, max=12)
@@ -59,41 +51,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         _LOGGER.error(f"Device {device_id} not found")
 
-    async def handle_feed_and_skip(call: ServiceCall) -> None:
-        """Handle feed and skip next meal service call."""
-        _LOGGER.info(f"======== SERVICE CALLED: petlibro.feed_and_skip_next ========")
-        device_id = call.data["device_id"]
-        portions = call.data["portions"]
-        _LOGGER.info(f"Service parameters: device_id={device_id}, portions={portions}")
-
-        # Get the device from the hub
-        hub = None
-        for entry_id in hass.data[DOMAIN]:
-            hub = hass.data[DOMAIN][entry_id]
-            if hub:
-                for device in hub.devices:
-                    if device.serial == device_id or device.name == device_id:
-                        _LOGGER.info(f"✓ Device found: {device.name} (serial: {device.serial})")
-                        _LOGGER.info(f"  Device type: {type(device).__name__}")
-                        _LOGGER.info(f"  Has manual_feed_and_skip_next: {hasattr(device, 'manual_feed_and_skip_next')}")
-
-                        # Check if device has the manual_feed_and_skip_next method
-                        if hasattr(device, 'manual_feed_and_skip_next'):
-                            _LOGGER.info(f"Calling device.manual_feed_and_skip_next({portions})...")
-                            try:
-                                await device.manual_feed_and_skip_next(portions)
-                                _LOGGER.info(f"✓ Service completed successfully")
-                            except Exception as e:
-                                _LOGGER.error(f"❌ Service failed with error: {e}", exc_info=True)
-                                raise
-                        else:
-                            _LOGGER.error(f"Device {device_id} does not support feed and skip functionality")
-
-                        _LOGGER.info(f"======== SERVICE COMPLETED ========")
-                        return
-
-        _LOGGER.error(f"Device {device_id} not found")
-
     hass.services.async_register(
         DOMAIN,
         SERVICE_MANUAL_FEED,
@@ -101,12 +58,4 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=SERVICE_SCHEMA_MANUAL_FEED,
     )
     _LOGGER.info(f"Registered service: {DOMAIN}.{SERVICE_MANUAL_FEED}")
-
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_FEED_AND_SKIP,
-        handle_feed_and_skip,
-        schema=SERVICE_SCHEMA_FEED_AND_SKIP,
-    )
-    _LOGGER.info(f"Registered service: {DOMAIN}.{SERVICE_FEED_AND_SKIP}")
-    _LOGGER.info("All PetLibro services registered")
+    _LOGGER.info("PetLibro services registered")
