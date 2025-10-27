@@ -61,8 +61,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_feed_and_skip(call: ServiceCall) -> None:
         """Handle feed and skip next meal service call."""
+        _LOGGER.info(f"======== SERVICE CALLED: petlibro.feed_and_skip_next ========")
         device_id = call.data["device_id"]
         portions = call.data["portions"]
+        _LOGGER.info(f"Service parameters: device_id={device_id}, portions={portions}")
 
         # Get the device from the hub
         hub = None
@@ -71,13 +73,23 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             if hub:
                 for device in hub.devices:
                     if device.serial == device_id or device.name == device_id:
-                        _LOGGER.info(f"Manual feeding {portions} portions and skipping next meal for device {device.name}")
+                        _LOGGER.info(f"✓ Device found: {device.name} (serial: {device.serial})")
+                        _LOGGER.info(f"  Device type: {type(device).__name__}")
+                        _LOGGER.info(f"  Has manual_feed_and_skip_next: {hasattr(device, 'manual_feed_and_skip_next')}")
 
                         # Check if device has the manual_feed_and_skip_next method
                         if hasattr(device, 'manual_feed_and_skip_next'):
-                            await device.manual_feed_and_skip_next(portions)
+                            _LOGGER.info(f"Calling device.manual_feed_and_skip_next({portions})...")
+                            try:
+                                await device.manual_feed_and_skip_next(portions)
+                                _LOGGER.info(f"✓ Service completed successfully")
+                            except Exception as e:
+                                _LOGGER.error(f"❌ Service failed with error: {e}", exc_info=True)
+                                raise
                         else:
                             _LOGGER.error(f"Device {device_id} does not support feed and skip functionality")
+
+                        _LOGGER.info(f"======== SERVICE COMPLETED ========")
                         return
 
         _LOGGER.error(f"Device {device_id} not found")

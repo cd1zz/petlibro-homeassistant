@@ -56,6 +56,18 @@ DEVICE_BUTTON_MAP: dict[type[Device], list[PetLibroButtonEntityDescription]] = {
             name="Manual Feed"
         ),
         PetLibroButtonEntityDescription[AirSmartFeeder](
+            key="manual_feed_and_skip_next",
+            translation_key="manual_feed_and_skip_next",
+            set_fn=lambda device: device.manual_feed_and_skip_next(),
+            name="Feed and Skip Next"
+        ),
+        PetLibroButtonEntityDescription[AirSmartFeeder](
+            key="skip_next_feeding",
+            translation_key="skip_next_feeding",
+            set_fn=lambda device: device.skip_next_feeding(),
+            name="Skip Next Feeding"
+        ),
+        PetLibroButtonEntityDescription[AirSmartFeeder](
             key="enable_feeding_plan",
             translation_key="enable_feeding_plan",
             set_fn=lambda device: device.set_feeding_plan(True),
@@ -86,6 +98,18 @@ DEVICE_BUTTON_MAP: dict[type[Device], list[PetLibroButtonEntityDescription]] = {
             translation_key="manual_feed",
             set_fn=lambda device: device.set_manual_feed(),
             name="Manual Feed"
+        ),
+        PetLibroButtonEntityDescription[GranarySmartFeeder](
+            key="manual_feed_and_skip_next",
+            translation_key="manual_feed_and_skip_next",
+            set_fn=lambda device: device.manual_feed_and_skip_next(),
+            name="Feed and Skip Next"
+        ),
+        PetLibroButtonEntityDescription[GranarySmartFeeder](
+            key="skip_next_feeding",
+            translation_key="skip_next_feeding",
+            set_fn=lambda device: device.skip_next_feeding(),
+            name="Skip Next Feeding"
         ),
         PetLibroButtonEntityDescription[GranarySmartFeeder](
             key="enable_feeding_plan",
@@ -126,6 +150,18 @@ DEVICE_BUTTON_MAP: dict[type[Device], list[PetLibroButtonEntityDescription]] = {
             name="Manual Feed (1 portion)"
         ),
         PetLibroButtonEntityDescription[GranarySmartCameraFeeder](
+            key="manual_feed_and_skip_next",
+            translation_key="manual_feed_and_skip_next",
+            set_fn=lambda device: device.manual_feed_and_skip_next(),
+            name="Feed and Skip Next"
+        ),
+        PetLibroButtonEntityDescription[GranarySmartCameraFeeder](
+            key="skip_next_feeding",
+            translation_key="skip_next_feeding",
+            set_fn=lambda device: device.skip_next_feeding(),
+            name="Skip Next Feeding"
+        ),
+        PetLibroButtonEntityDescription[GranarySmartCameraFeeder](
             key="enable_feeding_plan",
             translation_key="enable_feeding_plan",
             set_fn=lambda device: device.set_feeding_plan(True),
@@ -156,6 +192,18 @@ DEVICE_BUTTON_MAP: dict[type[Device], list[PetLibroButtonEntityDescription]] = {
             translation_key="manual_feed",
             set_fn=lambda device: device.set_manual_feed(),
             name="Manual Feed"
+        ),
+        PetLibroButtonEntityDescription[OneRFIDSmartFeeder](
+            key="manual_feed_and_skip_next",
+            translation_key="manual_feed_and_skip_next",
+            set_fn=lambda device: device.manual_feed_and_skip_next(),
+            name="Feed and Skip Next"
+        ),
+        PetLibroButtonEntityDescription[OneRFIDSmartFeeder](
+            key="skip_next_feeding",
+            translation_key="skip_next_feeding",
+            set_fn=lambda device: device.skip_next_feeding(),
+            name="Skip Next Feeding"
         ),
         PetLibroButtonEntityDescription[OneRFIDSmartFeeder](
             key="enable_feeding_plan",
@@ -244,6 +292,18 @@ DEVICE_BUTTON_MAP: dict[type[Device], list[PetLibroButtonEntityDescription]] = {
             translation_key="manual_feed",
             set_fn=lambda device: device.set_manual_feed(),
             name="Manual Feed"
+        ),
+        PetLibroButtonEntityDescription[SpaceSmartFeeder](
+            key="manual_feed_and_skip_next",
+            translation_key="manual_feed_and_skip_next",
+            set_fn=lambda device: device.manual_feed_and_skip_next(),
+            name="Feed and Skip Next"
+        ),
+        PetLibroButtonEntityDescription[SpaceSmartFeeder](
+            key="skip_next_feeding",
+            translation_key="skip_next_feeding",
+            set_fn=lambda device: device.skip_next_feeding(),
+            name="Skip Next Feeding"
         ),
         PetLibroButtonEntityDescription[SpaceSmartFeeder](
             key="enable_feeding_plan",

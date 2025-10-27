@@ -13,3 +13,11 @@ __pycache__/
 # Local test outputs
 api_enumeration_*.json
 api_test_results_*.json
+
+# Development and debug documentation
+DEBUG_SUMMARY.md
+BUTTON_ADDITIONS.md
+FEEDING_BUTTONS_GUIDE.md
+DEVELOPMENT_NOTES.md
+CLAUDE.md
+test_*.py

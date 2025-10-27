@@ -341,49 +341,131 @@ class GranarySmartCameraFeeder(Device):  # Inherit directly from Device
 
     async def manual_feed_and_skip_next(self, amount: int = None):
         """Feed specified amount and disable the next scheduled feeding for today"""
+        _LOGGER.info(f"======== manual_feed_and_skip_next called for {self.serial} ========")
+        _LOGGER.info(f"Amount requested: {amount}")
+
         # If no amount provided, try to get from device attributes or default
         if amount is None:
             amount = getattr(self, "manual_feed_quantity", 1)
+            _LOGGER.info(f"Amount was None, using default: {amount}")
 
-        # First, dispense the food
-        await self.api.set_manual_feed(self.serial, amount)
-
-        # Get today's feeding plans
-        today_plans_data = await self.api.device_feeding_plan_today_new(self.serial)
-
-        if today_plans_data and 'plans' in today_plans_data:
-            plans = today_plans_data['plans']
-
-            # Get current time in 24-hour format
-            now = datetime.now()
-            current_time = now.strftime("%H:%M")
-
-            # Find the next scheduled feeding (state == 1 and time > current_time)
-            next_feeding = None
-            for plan in sorted(plans, key=lambda p: p.get('time', '')):
-                # State 1 = SCHEDULED (toggled on)
-                if plan.get('state') == 1 and plan.get('time', '') > current_time:
-                    next_feeding = plan
-                    break
-
-            # Skip the next feeding for today only
-            if next_feeding:
-                plan_id = next_feeding.get('planId')
-                if plan_id:
-                    await self.api.set_feeding_plan_enable_today_single(self.serial, plan_id, False)
-                    _LOGGER.info(f"Skipped next feeding at {next_feeding.get('time')} (ID: {plan_id})")
-
-        await self.refresh()
-
-    # Method for setting the feeding plan
-    async def set_feeding_plan(self, value: bool) -> None:
-        _LOGGER.debug(f"Setting feeding plan to {value} for {self.serial}")
         try:
-            await self.api.set_feeding_plan(self.serial, value)
-            await self.refresh()  # Refresh the state after the action
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Failed to set feeding plan for {self.serial}: {err}")
-            raise PetLibroAPIError(f"Error setting feeding plan: {err}")
+            # First, dispense the food
+            _LOGGER.info(f"Step 1: Dispensing {amount} portions...")
+            await self.api.set_manual_feed(self.serial, amount)
+            _LOGGER.info(f"✓ Food dispensed successfully")
+
+            # Get today's feeding plans
+            _LOGGER.info(f"Step 2: Getting today's feeding plans...")
+            today_plans_data = await self.api.device_feeding_plan_today_new(self.serial)
+            _LOGGER.info(f"Today's plans data: {today_plans_data}")
+
+            if today_plans_data and 'plans' in today_plans_data:
+                plans = today_plans_data['plans']
+                _LOGGER.info(f"Found {len(plans)} plans for today")
+
+                # Get current time in 24-hour format
+                now = datetime.now()
+                current_time = now.strftime("%H:%M")
+                _LOGGER.info(f"Current time: {current_time}")
+
+                # Find the next scheduled feeding (state == 1 and time > current_time)
+                next_feeding = None
+                for plan in sorted(plans, key=lambda p: p.get('time', '')):
+                    _LOGGER.debug(f"  Checking plan: time={plan.get('time')}, state={plan.get('state')}, planId={plan.get('planId')}")
+                    # State 1 = SCHEDULED (toggled on)
+                    if plan.get('state') == 1 and plan.get('time', '') > current_time:
+                        next_feeding = plan
+                        _LOGGER.info(f"✓ Found next feeding: {plan.get('time')} (ID: {plan.get('planId')})")
+                        break
+
+                # Skip the next feeding for today only
+                if next_feeding:
+                    plan_id = next_feeding.get('planId')
+                    plan_time = next_feeding.get('time')
+                    if plan_id:
+                        _LOGGER.info(f"Step 3: Calling set_feeding_plan_enable_today_single...")
+                        _LOGGER.info(f"  Endpoint: /device/feedingPlan/enableTodaySingle")
+                        _LOGGER.info(f"  Serial: {self.serial}")
+                        _LOGGER.info(f"  Plan ID: {plan_id}")
+                        _LOGGER.info(f"  Enable: False")
+
+                        await self.api.set_feeding_plan_enable_today_single(self.serial, plan_id, False)
+
+                        _LOGGER.info(f"✓ Successfully called enable_today_single for plan {plan_id}")
+                        _LOGGER.info(f"✓ Skipped next feeding at {plan_time} (ID: {plan_id}) FOR TODAY ONLY")
+                else:
+                    _LOGGER.warning(f"No upcoming feeding found to skip")
+            else:
+                _LOGGER.warning(f"No plans data available")
+
+            _LOGGER.info(f"Step 4: Refreshing device state...")
+            await self.refresh()
+            _LOGGER.info(f"✓ Refresh complete")
+            _LOGGER.info(f"======== manual_feed_and_skip_next completed ========")
+
+        except Exception as e:
+            _LOGGER.error(f"❌ ERROR in manual_feed_and_skip_next: {e}", exc_info=True)
+            raise
+
+    async def skip_next_feeding(self):
+        """Skip the next scheduled feeding for today only (without dispensing food)"""
+        _LOGGER.info(f"======== skip_next_feeding called for {self.serial} ========")
+        _LOGGER.info(f"NO FOOD will be dispensed - only skipping next scheduled feeding")
+
+        try:
+            # Get today's feeding plans
+            _LOGGER.info(f"Step 1: Getting today's feeding plans...")
+            today_plans_data = await self.api.device_feeding_plan_today_new(self.serial)
+            _LOGGER.info(f"Today's plans data: {today_plans_data}")
+
+            if today_plans_data and 'plans' in today_plans_data:
+                plans = today_plans_data['plans']
+                _LOGGER.info(f"Found {len(plans)} plans for today")
+
+                # Get current time in 24-hour format
+                now = datetime.now()
+                current_time = now.strftime("%H:%M")
+                _LOGGER.info(f"Current time: {current_time}")
+
+                # Find the next scheduled feeding (state == 1 and time > current_time)
+                next_feeding = None
+                for plan in sorted(plans, key=lambda p: p.get('time', '')):
+                    _LOGGER.debug(f"  Checking plan: time={plan.get('time')}, state={plan.get('state')}, planId={plan.get('planId')}")
+                    # State 1 = SCHEDULED (toggled on)
+                    if plan.get('state') == 1 and plan.get('time', '') > current_time:
+                        next_feeding = plan
+                        _LOGGER.info(f"✓ Found next feeding: {plan.get('time')} (ID: {plan.get('planId')})")
+                        break
+
+                # Skip the next feeding for today only
+                if next_feeding:
+                    plan_id = next_feeding.get('planId')
+                    plan_time = next_feeding.get('time')
+                    if plan_id:
+                        _LOGGER.info(f"Step 2: Calling set_feeding_plan_enable_today_single...")
+                        _LOGGER.info(f"  Endpoint: /device/feedingPlan/enableTodaySingle")
+                        _LOGGER.info(f"  Serial: {self.serial}")
+                        _LOGGER.info(f"  Plan ID: {plan_id}")
+                        _LOGGER.info(f"  Enable: False")
+
+                        await self.api.set_feeding_plan_enable_today_single(self.serial, plan_id, False)
+
+                        _LOGGER.info(f"✓ Successfully called enable_today_single for plan {plan_id}")
+                        _LOGGER.info(f"✓ Skipped next feeding at {plan_time} (ID: {plan_id}) FOR TODAY ONLY")
+                else:
+                    _LOGGER.warning(f"No upcoming feeding found to skip")
+            else:
+                _LOGGER.warning(f"No plans data available")
+
+            _LOGGER.info(f"Step 3: Refreshing device state...")
+            await self.refresh()
+            _LOGGER.info(f"✓ Refresh complete")
+            _LOGGER.info(f"======== skip_next_feeding completed ========")
+
+        except Exception as e:
+            _LOGGER.error(f"❌ ERROR in skip_next_feeding: {e}", exc_info=True)
+            raise
 
     # Method for indicator turn on
     async def set_light_on(self) -> None:
