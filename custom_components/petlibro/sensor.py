@@ -201,8 +201,7 @@ class PetLibroSensorEntity(PetLibroEntity[_DeviceT], SensorEntity):
             return {
                 f"plan_{plan['index']}": {
                     "time": plan["time"],
-                    "amount": f"{Unit.convert_feed(plan['grainNum'], None, 
-                    self.member.feedUnitType, True)} {self.member.feedUnitType.symbol}",
+                    "amount": f"{Unit.convert_feed(plan['grainNum'], None, self.member.feedUnitType, True)} {self.member.feedUnitType.symbol}",
                     "state": self._format_state(plan["state"]),
                     "repeat": plan["repeat"],
                     "planID": plan["planId"]
@@ -671,6 +670,41 @@ DEVICE_SENSOR_MAP: dict[type[Device], list[PetLibroSensorEntityDescription]] = {
             icon="mdi:motion-sensor",
             name="Video Recording Mode",
             should_report=lambda device: device.video_record_mode is not None  # Corrected name
+        ),
+        PetLibroSensorEntityDescription[GranarySmartCameraFeeder](
+            key="running_state",
+            translation_key="running_state",
+            icon="mdi:state-machine",
+            name="Running State",
+            should_report=lambda device: device.running_state is not None
+        ),
+        PetLibroSensorEntityDescription[GranarySmartCameraFeeder](
+            key="vacuum_state",
+            translation_key="vacuum_state",
+            icon="mdi:vacuum",
+            name="Vacuum Seal State",
+            should_report=lambda device: device.vacuum_state is not None
+        ),
+        PetLibroSensorEntityDescription[GranarySmartCameraFeeder](
+            key="screen_display_switch",
+            translation_key="screen_display_switch",
+            icon="mdi:monitor",
+            name="Display",
+            should_report=lambda device: device.screen_display_switch is not None
+        ),
+        PetLibroSensorEntityDescription[GranarySmartCameraFeeder](
+            key="enable_sound",
+            translation_key="enable_sound",
+            icon="mdi:volume-high",
+            name="Sound Enabled",
+            should_report=lambda device: device.enable_sound is not None
+        ),
+        PetLibroSensorEntityDescription[GranarySmartCameraFeeder](
+            key="enable_light",
+            translation_key="enable_light",
+            icon="mdi:lightbulb-outline",
+            name="Light Enabled",
+            should_report=lambda device: device.enable_light is not None
         ),
     ],
     OneRFIDSmartFeeder: [
