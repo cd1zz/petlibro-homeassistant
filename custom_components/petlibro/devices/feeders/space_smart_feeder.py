@@ -45,8 +45,8 @@ class SpaceSmartFeeder(Device):  # Inherit directly from Device
 
     @property
     def available(self) -> bool:
-        _LOGGER.debug(f"Device {self.device.name} availability: {self.device.online}")
-        return self.device.online if hasattr(self.device, 'online') else True
+        _LOGGER.debug(f"Device {self.name} availability: {self.online}")
+        return self.online if hasattr(self, 'online') else True
 
     @property
     def today_feeding_quantities(self) -> list[int]:
