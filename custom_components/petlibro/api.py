@@ -166,11 +166,11 @@ class PetLibroSession:
 
         except aiohttp.ClientError as e:
             _LOGGER.error(f"Re-login failed due to a client error: {e}")
-            raise PetLibroAPIError(f"Client error during re-login: {e}")
+            raise ConfigEntryAuthFailed(f"Client error during re-login: {e}") from e
 
         except Exception as e:
             _LOGGER.error(f"Re-login attempt failed due to an unexpected error: {e}")
-            raise PetLibroAPIError(f"Unexpected error during re-login: {e}")
+            raise ConfigEntryAuthFailed(f"Unexpected error during re-login: {e}") from e
 
 class PetLibroAPI:
     """PetLibro API class"""
@@ -592,24 +592,19 @@ class PetLibroAPI:
                 "/device/setting/updateChildLockSwitch",
                 json={"deviceSn": serial, "enable": enable}
             )
-
-            _LOGGER.debug(f"Child lock response status: {response.status}")
-            _LOGGER.debug(f"Child lock response data: {await response.text()}")
-
-            response.raise_for_status()
-        except aiohttp.ClientError as err:
+            _LOGGER.debug(f"Child lock response data: {response}")
+        except (aiohttp.ClientError, PetLibroAPIError) as err:
             _LOGGER.error(f"Failed to set child lock for device {serial}: {err}")
             raise PetLibroAPIError(f"Error setting child lock: {err}")
 
     async def set_light_enable(self, serial: str, enable: bool):
         """Enable or disable the light functionality with error handling."""
         try:
-            response = await self.session.post(
+            await self.session.post(
                 "/device/setting/updateLightEnableSwitch",
                 json={"deviceSn": serial, "enable": enable}
             )
-            response.raise_for_status()
-        except aiohttp.ClientError as err:
+        except (aiohttp.ClientError, PetLibroAPIError) as err:
             _LOGGER.error(f"Failed to set light enable for device {serial}: {err}")
             raise PetLibroAPIError(f"Error setting light enable: {err}")
 
@@ -623,10 +618,11 @@ class PetLibroAPI:
     async def set_sound_enable(self, serial: str, enable: bool):
         """Enable or disable the sound functionality."""
         try:
-            response = await self.session.post("/device/setting/updateSoundEnableSwitch", json={"deviceSn": serial, "enable": enable}
+            await self.session.post(
+                "/device/setting/updateSoundEnableSwitch",
+                json={"deviceSn": serial, "enable": enable}
             )
-            response.raise_for_status()
-        except aiohttp.ClientError as err:
+        except (aiohttp.ClientError, PetLibroAPIError) as err:
             _LOGGER.error(f"Failed to set sound enable for device {serial}: {err}")
             raise PetLibroAPIError(f"Error setting sound enable: {err}")
 
@@ -722,7 +718,7 @@ class PetLibroAPI:
             _LOGGER.debug(f"Vacuum mode successful, returned code: {response}")
             return response
         except Exception as e:
-            _LOGGER.error(f"Failed to set water dispensing mode for device {serial}: {e}")
+            _LOGGER.error(f"Failed to set vacuum mode for device {serial}: {e}")
             raise
 
 
@@ -1063,22 +1059,10 @@ class PetLibroAPI:
                 "requestId": request_id  # Use dynamic request ID
             })
 
-            # Check if response is already parsed (since response is an integer here)
-            if isinstance(response, int):
-                _LOGGER.debug(f"Manual feeding successful, returned code: {response}")
-                return response
-            
-            # If response is a dictionary (JSON), handle it
-            response_data = await response.json()
-            _LOGGER.debug(f"Manual feeding response data: {response_data}")
-            
-            # Check if the response indicates success
-            if response.status != 200 or response_data.get("code") != 0:
-                raise PetLibroAPIError(f"Failed to trigger manual feeding: {response_data.get('msg')}")
+            _LOGGER.debug(f"Manual feeding response: {response}")
+            return response
 
-            return response_data
-
-        except aiohttp.ClientError as err:
+        except (aiohttp.ClientError, PetLibroAPIError) as err:
             _LOGGER.error(f"Failed to trigger manual feeding for device {serial}: {err}")
             raise PetLibroAPIError(f"Error triggering manual feeding: {err}")
 
@@ -1160,27 +1144,10 @@ class PetLibroAPI:
                 "timeout": 5000
             })
 
-            # Granary smart feeder quirk: response can be None on success
-            if response is None:
-                _LOGGER.debug("Desiccant reset set successfully, got no extra data")
-                return
+            _LOGGER.debug(f"Desiccant reset response: {response}")
+            return response
 
-            # Check if response is already parsed (since response is an integer here)
-            if isinstance(response, int):
-                _LOGGER.debug(f"Desiccant reset set successfully, returned code: {response}")
-                return response
-
-            # If response is a dictionary (JSON), handle it
-            response_data = await response.json()
-            _LOGGER.debug(f"Desiccant reset response data: {response_data}")
-
-            # Check if the response indicates success
-            if response.status != 200 or response_data.get("code") != 0:
-                raise PetLibroAPIError(f"Failed to trigger desiccant reset: {response_data.get('msg')}")
-
-            return response_data
-
-        except aiohttp.ClientError as err:
+        except (aiohttp.ClientError, PetLibroAPIError) as err:
             _LOGGER.error(f"Failed to trigger desiccant reset for device {serial}: {err}")
             raise PetLibroAPIError(f"Error triggering desiccant reset: {err}")
 
@@ -1213,22 +1180,10 @@ class PetLibroAPI:
                 "timeout": 5000
             })
 
-            # Check if response is already parsed (since response is an integer here)
-            if isinstance(response, int):
-                _LOGGER.debug(f"Machine cleaning reset set successfully, returned code: {response}")
-                return response
-            
-            # If response is a dictionary (JSON), handle it
-            response_data = await response.json()
-            _LOGGER.debug(f"Machine cleaning reset response data: {response_data}")
-            
-            # Check if the response indicates success
-            if response.status != 200 or response_data.get("code") != 0:
-                raise PetLibroAPIError(f"Failed to trigger machine cleaning reset: {response_data.get('msg')}")
+            _LOGGER.debug(f"Machine cleaning reset response: {response}")
+            return response
 
-            return response_data
-
-        except aiohttp.ClientError as err:
+        except (aiohttp.ClientError, PetLibroAPIError) as err:
             _LOGGER.error(f"Failed to trigger machine cleaning reset for device {serial}: {err}")
             raise PetLibroAPIError(f"Error triggering machine cleaning reset: {err}")
 
@@ -1247,24 +1202,12 @@ class PetLibroAPI:
                 "timeout": 5000
             })
 
-            # Check if response is already parsed (since response is an integer here)
-            if isinstance(response, int):
-                _LOGGER.debug(f"Filter reset set successfully, returned code: {response}")
-                return response
-            
-            # If response is a dictionary (JSON), handle it
-            response_data = await response.json()
-            _LOGGER.debug(f"Machine cleaning reset response data: {response_data}")
-            
-            # Check if the response indicates success
-            if response.status != 200 or response_data.get("code") != 0:
-                raise PetLibroAPIError(f"Failed to trigger machine cleaning reset: {response_data.get('msg')}")
+            _LOGGER.debug(f"Filter reset response: {response}")
+            return response
 
-            return response_data
-
-        except aiohttp.ClientError as err:
-            _LOGGER.error(f"Failed to trigger machine cleaning reset for device {serial}: {err}")
-            raise PetLibroAPIError(f"Error triggering machine cleaning reset: {err}")
+        except (aiohttp.ClientError, PetLibroAPIError) as err:
+            _LOGGER.error(f"Failed to trigger filter reset for device {serial}: {err}")
+            raise PetLibroAPIError(f"Error triggering filter reset: {err}")
 
     async def set_manual_lid_open(self, serial: str):
         """Trigger manual lid opening for a specific device."""
@@ -1334,25 +1277,6 @@ class PetLibroAPI:
             "soundEndTime": None
         })
 
-    async def set_light_on(self, serial: str):
-        """Trigger turn light on"""
-        await self.session.post("/device/setting/updateLightingSetting", json={
-            "deviceSn": serial,
-            "lightSwitch": True,
-            "lightAgingType": 1,
-            "soundStartTime": None,
-            "soundEndTime": None
-        })
-    
-    async def set_light_off(self, serial: str):
-        """Trigger turn light off"""
-        await self.session.post("/device/setting/updateLightingSetting", json={
-            "deviceSn": serial,
-            "lightSwitch": False,
-            "lightAgingType": 1,
-            "lightingStartTime": None,
-            "lightingEndTime": None
-        })
 
     async def set_sleep_on(self, serial: str):
         """Trigger turn sleep mode on"""
