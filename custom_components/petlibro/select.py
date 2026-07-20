@@ -18,6 +18,7 @@ from homeassistant.components.select import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import Platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry  # Added ConfigEntry import
@@ -83,8 +84,18 @@ class PetLibroSelectEntity(PetLibroEntity[_DeviceT], SelectEntity):
         """Initialize the select entity."""
         super().__init__(device, hub, description)
 
+        # Holds the user's choice only until the next coordinator update confirms
+        # (or contradicts) it.
+        self._optimistic_option: str | None = None
+
         if (unit_type := self.entity_description.petlibro_unit) and unit_type == APIKey.FEED_UNIT:
             self.hub.manual_feed_unique_ids[Platform.SELECT].append(self._attr_unique_id)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Drop the optimistic value once fresh device data has arrived."""
+        self._optimistic_option = None
+        super()._handle_coordinator_update()
 
     @property
     def options(self) -> list[str]:
@@ -100,9 +111,11 @@ class PetLibroSelectEntity(PetLibroEntity[_DeviceT], SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        # If we've set a current option explicitly and it's valid, prefer it
-        if hasattr(self, "_attr_current_option") and self._attr_current_option in self.options:
-            return self._attr_current_option
+        # Prefer the user's just-made choice, but only until the next coordinator
+        # update clears it. Previously this preference was permanent, so a change
+        # made in the PetLibro app (or by another user) never showed up in HA.
+        if self._optimistic_option is not None and self._optimistic_option in self.options:
+            return self._optimistic_option
 
         if self.entity_description.current_selection is not None:
             try:
@@ -129,12 +142,17 @@ class PetLibroSelectEntity(PetLibroEntity[_DeviceT], SelectEntity):
 
             # Immediately reflect the user's choice if it's a valid option
             if current_selection in self.options:
-                self._attr_current_option = current_selection
+                self._optimistic_option = current_selection
                 self.async_write_ha_state()
 
             _LOGGER.debug(f"Current option {current_selection} set successfully for {self.device.name}")
         except Exception as e:
+            # Surface the failure: swallowing it left HA showing a value the
+            # device never accepted, with no error for the user or automation.
             _LOGGER.error(f"Error setting current option {current_selection} for {self.device.name}: {e}")
+            raise HomeAssistantError(
+                f"Failed to set {self.name} to {current_selection}: {e}"
+            ) from e
 
     @property
     def available(self) -> bool:

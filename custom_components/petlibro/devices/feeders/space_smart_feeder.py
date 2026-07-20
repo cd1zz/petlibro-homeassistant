@@ -5,12 +5,13 @@ from logging import getLogger
 from ...exceptions import PetLibroAPIError
 from ...const import MAX_FEED_PORTIONS
 from ..device import Device
+from .feeding_plan import FeedingPlanSkipMixin
 from datetime import datetime
 from homeassistant.util import dt as dt_util
 
 _LOGGER = getLogger(__name__)
 
-class SpaceSmartFeeder(Device):  # Inherit directly from Device
+class SpaceSmartFeeder(FeedingPlanSkipMixin, Device):
     def __init__(self, *args, **kwargs):
         """Initialize the feeder with default values."""
         super().__init__(*args, **kwargs)
@@ -188,17 +189,17 @@ class SpaceSmartFeeder(Device):  # Inherit directly from Device
 
     @property
     def vacuum_state(self) -> bool:
-        events = self._data.get("getDeviceEvents", {}).get("data", {}).get("eventInfos", [])
+        events = self._data.get("getDeviceEvents", {}).get("eventInfos", [])
         return any(event.get("eventKey") == "VACUUM_FAILED" for event in events)
 
     @property
     def food_dispenser_state(self) -> bool:
-        events = self._data.get("getDeviceEvents", {}).get("data", {}).get("eventInfos", [])
+        events = self._data.get("getDeviceEvents", {}).get("eventInfos", [])
         return any(event.get("eventKey") == "GRAIN_OUTLET_BLOCKED_OVERTIME" for event in events)
  
     @property
     def food_outlet_state(self) -> bool:
-        events = self._data.get("getDeviceEvents", {}).get("data", {}).get("eventInfos", [])
+        events = self._data.get("getDeviceEvents", {}).get("eventInfos", [])
         return any(event.get("eventKey") == "FOOD_OUTLET_DOOR_FAILED_CLOSE" for event in events)
       
     @property

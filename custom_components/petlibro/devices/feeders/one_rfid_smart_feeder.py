@@ -5,6 +5,7 @@ from aiohttp import ClientSession, ClientError
 from ...exceptions import PetLibroAPIError
 from ...const import MAX_FEED_PORTIONS
 from ..device import Device
+from .feeding_plan import FeedingPlanSkipMixin
 from typing import cast
 from logging import getLogger
 from datetime import datetime, timezone
@@ -12,7 +13,7 @@ from homeassistant.util import dt as dt_util
 
 _LOGGER = getLogger(__name__)
 
-class OneRFIDSmartFeeder(Device):
+class OneRFIDSmartFeeder(FeedingPlanSkipMixin, Device):
     def __init__(self, *args, **kwargs):
         """Initialize the feeder with default values."""
         super().__init__(*args, **kwargs)
@@ -198,10 +199,6 @@ class OneRFIDSmartFeeder(Device):
     @property
     def display_switch(self) -> bool:
         return bool(self._data.get("realInfo", {}).get("screenDisplaySwitch", False))
-
-    @property
-    def child_lock_switch(self) -> bool:
-        return not self._data.get("realInfo", {}).get("childLockSwitch", False)
 
     @property
     def remaining_desiccant(self) -> float | None:
