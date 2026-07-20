@@ -112,6 +112,27 @@
     },
     "entity": {
         "sensor": {
+            "child_lock_switch": {
+                "name": "Buttons Lock"
+            },
+            "enable_light": {
+                "name": "Light Enabled"
+            },
+            "enable_sound": {
+                "name": "Sound Enabled"
+            },
+            "pump_air_state": {
+                "name": "Pump Air State"
+            },
+            "running_state": {
+                "name": "Running State"
+            },
+            "screen_display_switch": {
+                "name": "Display"
+            },
+            "vacuum_state": {
+                "name": "Vacuum Seal State"
+            },
             "device_sn": {
                 "name": "Device SN"
             },
@@ -257,6 +278,15 @@
             }
         },
         "button": {
+            "disable_next_feeding": {
+                "name": "Disable Next Scheduled Feeding"
+            },
+            "enable_next_feeding": {
+                "name": "Enable Next Scheduled Feeding"
+            },
+            "manual_feed_and_skip_next": {
+                "name": "Feed and Skip Next"
+            },
             "manual_feed": {
                 "name": "Manual Feed"
             },
@@ -363,6 +393,15 @@
             }
         },
         "number": {
+            "desiccant_frequency": {
+                "name": "Desiccant Frequency"
+            },
+            "water_sensing_delay": {
+                "name": "Water Sensing Delay"
+            },
+            "skip_window_minutes": {
+                "name": "Skip Next Feeding Window"
+            },
             "sound_level": {
                 "name": "Volume Level"
             },
@@ -392,6 +431,9 @@
             }
         },
         "select": {
+            "vacuum_mode": {
+                "name": "Vacuum Mode"
+            },
             "lid_speed": {
                 "name": "Lid Speed"
             },

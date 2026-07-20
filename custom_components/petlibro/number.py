@@ -10,13 +10,18 @@ from functools import cached_property
 from typing import Optional
 from typing import Any
 import logging
-from .const import DOMAIN, Unit, APIKey, MAX_FEED_PORTIONS, MANUAL_FEED_PORTIONS
+from .const import (
+    DOMAIN, Unit, APIKey, MAX_FEED_PORTIONS, MANUAL_FEED_PORTIONS,
+    DEFAULT_SKIP_WINDOW_MINUTES, MIN_SKIP_WINDOW_MINUTES, MAX_SKIP_WINDOW_MINUTES,
+)
 from homeassistant.components.number import (
     NumberEntity,
     NumberEntityDescription,
     NumberDeviceClass,
-    NumberMode
+    NumberMode,
+    RestoreNumber,
 )
+from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.const import UnitOfVolume, Platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -58,6 +63,10 @@ class PetLibroNumberEntityDescription(NumberEntityDescription, PetLibroEntityDes
     entity_registry_enabled_default_fn: Callable[[PetLibroNumberEntity], bool | None] = lambda _: None
     available_fn: Callable[[PetLibroNumberEntity], bool | None] = lambda _: None
     petlibro_unit: APIKey | str | None = None
+    # True when the value lives only in Home Assistant (the PetLibro API has no
+    # field for it), so it must be restored across restarts rather than re-read
+    # from the device.
+    local_state: bool = False
 
 class PetLibroNumberEntity(PetLibroEntity[_DeviceT], NumberEntity):
     """PETLIBRO number entity."""
@@ -171,9 +180,56 @@ class PetLibroNumberEntity(PetLibroEntity[_DeviceT], NumberEntity):
             super()._handle_coordinator_update()
 
 
+class PetLibroLocalNumberEntity(PetLibroNumberEntity[_DeviceT], RestoreNumber):
+    """A number whose value lives in Home Assistant rather than on the device.
+
+    The PetLibro API has no field for these, so without restoring the previous
+    value every restart would silently revert the setting to its default.
+    """
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last value the user set."""
+        await super().async_added_to_hass()
+
+        last_number_data = await self.async_get_last_number_data()
+        if last_number_data is None or last_number_data.native_value is None:
+            _LOGGER.debug(
+                "No previous value for %s; keeping default.", self.entity_description.key
+            )
+            return
+
+        value = last_number_data.native_value
+        _LOGGER.debug("Restoring %s to %s", self.entity_description.key, value)
+        await self.entity_description.method(self, self.device, value)
+
+
+def skip_window_description(device_type: type[Device]) -> PetLibroNumberEntityDescription:
+    """Build the 'Skip Next Feeding Window' entity for a feeder.
+
+    One definition shared by every feeder that mixes in FeedingPlanSkipMixin, so
+    the bound can't drift between device types.
+    """
+    return PetLibroNumberEntityDescription[device_type](
+        key="skip_window_minutes",
+        translation_key="skip_window_minutes",
+        name="Skip Next Feeding Window",
+        icon="mdi:clock-alert-outline",
+        mode=NumberMode.BOX,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        native_min_value=MIN_SKIP_WINDOW_MINUTES,
+        native_max_value=MAX_SKIP_WINDOW_MINUTES,
+        native_step=5,
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda s, d: d.skip_window_minutes,
+        method=lambda s, d, v: d.set_skip_window_minutes(v),
+        local_state=True,
+    )
+
+
 DEVICE_NUMBER_MAP: dict[type[Device], list[PetLibroNumberEntityDescription]] = {
     Feeder: [],
     AirSmartFeeder: [
+        skip_window_description(AirSmartFeeder),
         PetLibroNumberEntityDescription[AirSmartFeeder](
             key="manual_feed_quantity",
             translation_key="manual_feed_quantity",
@@ -196,6 +252,7 @@ DEVICE_NUMBER_MAP: dict[type[Device], list[PetLibroNumberEntityDescription]] = {
         ),
     ],
     GranarySmartFeeder: [
+        skip_window_description(GranarySmartFeeder),
         PetLibroNumberEntityDescription[GranarySmartFeeder](
             key="manual_feed_quantity",
             translation_key="manual_feed_quantity",
@@ -226,7 +283,7 @@ DEVICE_NUMBER_MAP: dict[type[Device], list[PetLibroNumberEntityDescription]] = {
             native_min_value=1,
             native_step=1,
             value_fn=lambda s, device: device.desiccant_frequency,
-            method=lambda s, device, value: device.set_desiccant_frequency(value),
+            method=lambda s, device, value: device.set_desiccant_cycle(value),
             name="Desiccant Frequency",
         ),
     ],
@@ -251,8 +308,10 @@ DEVICE_NUMBER_MAP: dict[type[Device], list[PetLibroNumberEntityDescription]] = {
             available_fn=lambda self: self.enable_for_manual_feed,
             petlibro_unit=APIKey.FEED_UNIT,
         ),
+        skip_window_description(GranarySmartCameraFeeder),
     ],
     OneRFIDSmartFeeder: [
+        skip_window_description(OneRFIDSmartFeeder),
         PetLibroNumberEntityDescription[OneRFIDSmartFeeder](
             key="desiccant_cycle",
             translation_key="desiccant_cycle",
@@ -313,6 +372,7 @@ DEVICE_NUMBER_MAP: dict[type[Device], list[PetLibroNumberEntityDescription]] = {
     ],
     PolarWetFoodFeeder: [],
     SpaceSmartFeeder: [
+        skip_window_description(SpaceSmartFeeder),
         PetLibroNumberEntityDescription[SpaceSmartFeeder](
             key="manual_feed_quantity",
             translation_key="manual_feed_quantity",
@@ -616,7 +676,9 @@ async def async_setup_entry(
 
     # Create number entities for each device based on the number map
     entities = [
-        PetLibroNumberEntity(device, hub, description)
+        (PetLibroLocalNumberEntity if description.local_state else PetLibroNumberEntity)(
+            device, hub, description
+        )
         for device in devices  # Iterate through devices from the hub
         for device_type, entity_descriptions in DEVICE_NUMBER_MAP.items()
         if isinstance(device, device_type)
