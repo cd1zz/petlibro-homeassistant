@@ -18,6 +18,7 @@ from urllib.parse import urljoin
 from typing import Any, Dict, List, TypeAlias
 from datetime import datetime, timedelta
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.const import CONF_API_TOKEN
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from .exceptions import PetLibroAPIError, PetLibroCannotConnect, PetLibroInvalidAuth
 from aiohttp import ClientSession, ClientError
@@ -215,12 +216,16 @@ class PetLibroSession:
                 new_token = payload["token"]
                 self.token = new_token  # Update the session token
 
-                # Save the new token in the config entry
-                if hasattr(self, 'api') and self.api.hass and self.api.config_entry:
-                    _LOGGER.debug(f"Saving new token to config entry: {self.token}")
-                    self.api.hass.config_entries.async_update_entry(
-                        self.api.config_entry,
-                        data={**self.api.config_entry.data, "token": self.token}
+                # Persist the refreshed token under the same key the config flow
+                # writes and the hub reads. It was previously stored as "token"
+                # while both of those use CONF_API_TOKEN, so even when this ran
+                # the value could never be read back.
+                api = getattr(self, "api", None)
+                if api is not None and api.hass and api.config_entry:
+                    _LOGGER.debug("Persisting refreshed token to the config entry")
+                    api.hass.config_entries.async_update_entry(
+                        api.config_entry,
+                        data={**api.config_entry.data, CONF_API_TOKEN: new_token},
                     )
 
                 return new_token
@@ -267,10 +272,14 @@ class PetLibroAPI:
         # Inject the API reference into the session for token saving
         self.session.api = self
 
-        # Load the saved token if available
-        if config_entry and "token" in config_entry.data:
-            self.token = config_entry.data["token"]
-            _LOGGER.debug(f"Loaded saved token: {self.token}")
+        # Load the saved token if available. This must use the same key the
+        # config flow writes (CONF_API_TOKEN) and must reach the session, which
+        # is what actually attaches the token to requests -- PetLibroAPI.token
+        # is not read anywhere.
+        if config_entry and (saved := config_entry.data.get(CONF_API_TOKEN)):
+            self.token = saved
+            self.session.token = saved
+            _LOGGER.debug("Loaded saved token from the config entry")
 
         self._last_api_call_times = {}  # To store last call time per device
         self._cached_responses = {}  # To store cached responses for short periods
