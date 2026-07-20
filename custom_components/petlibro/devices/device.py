@@ -3,7 +3,10 @@
 from logging import getLogger
 from typing import cast
 
+from homeassistant.exceptions import ConfigEntryAuthFailed
+
 from ..api import PetLibroAPI
+from ..exceptions import PetLibroAPIError
 from .event import Event, EVENT_UPDATE
 from ..member import Member
 
@@ -40,6 +43,14 @@ class Device(Event):
             data.update(await self.api.device_real_info(self.serial))
             data.update(await self.api.device_attribute_settings(self.serial))
             self.update_data(data)
+        except ConfigEntryAuthFailed:
+            # Must reach the coordinator so Home Assistant can start the reauth
+            # flow; swallowing it here left the integration retrying a dead
+            # token forever without ever prompting the user.
+            raise
+        except PetLibroAPIError:
+            # Let the subclass handler (and ultimately the coordinator) see it.
+            raise
         except Exception as e:
             _LOGGER.error(f"Failed to refresh device data: {e}")
 

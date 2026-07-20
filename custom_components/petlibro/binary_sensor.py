@@ -6,7 +6,7 @@ from aiohttp import ClientSession, ClientError
 from dataclasses import dataclass
 from collections.abc import Callable
 from functools import cached_property
-from typing import Optional
+from typing import Any, Optional
 import logging
 from .const import DOMAIN
 from homeassistant.components.binary_sensor import (
@@ -45,6 +45,10 @@ class PetLibroBinarySensorEntityDescription(BinarySensorEntityDescription, PetLi
     device_class_fn: Callable[[_DeviceT], BinarySensorDeviceClass | None] = lambda _: None
     should_report: Callable[[_DeviceT], bool] = lambda _: True
     device_class: Optional[BinarySensorDeviceClass] = None
+    # Maps the raw device attribute onto what the device class means. Needed
+    # where HA's convention is the inverse of the device's own flag, e.g.
+    # BinarySensorDeviceClass.LOCK reports on == unlocked.
+    value_fn: Optional[Callable[[Any], bool]] = None
 
 class PetLibroBinarySensorEntity(PetLibroEntity[_DeviceT], BinarySensorEntity):
     """PETLIBRO sensor entity."""
@@ -57,32 +61,40 @@ class PetLibroBinarySensorEntity(PetLibroEntity[_DeviceT], BinarySensorEntity):
         return self.entity_description.device_class
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
         """Return True if the binary sensor is on."""
         # Check if the binary sensor should report its state
         if not self.entity_description.should_report(self.device):
-            return False
+            return None
 
         # Retrieve the state using getattr, defaulting to None if the attribute is missing
         state = getattr(self.device, self.entity_description.key, None)
+        if state is None:
+            # Report unknown rather than a definite "off" -- for the CONNECTIVITY
+            # sensor those two mean very different things.
+            return None
 
-        # Check if this is the first time the sensor is being refreshed by checking if _last_state exists
-        last_state = getattr(self, '_last_state', None)
-        initial_log_done = getattr(self, '_initial_log_done', False)  # Track if we've logged the initial state
+        # Only the connectivity sensor knows anything about being online; this
+        # logging previously ran for every key, so toggling the LED or clearing a
+        # low-food warning emitted "Device <name> is offline."
+        if self.entity_description.key == "online":
+            last_state = getattr(self, '_last_state', None)
+            initial_log_done = getattr(self, '_initial_log_done', False)
 
-        # If this is the initial boot, don't log anything but track the state
-        if not initial_log_done:
-            # Mark the initial log as done without logging
-            self._initial_log_done = True  
-        elif last_state != state:
-            # Log state changes: log online with INFO and offline with WARNING
-            if state:
-                _LOGGER.info(f"Device {self.device.name} is online.")
-            else:
-                _LOGGER.warning(f"Device {self.device.name} is offline.")
+            # If this is the initial boot, don't log anything but track the state
+            if not initial_log_done:
+                self._initial_log_done = True
+            elif last_state != state:
+                if state:
+                    _LOGGER.info(f"Device {self.device.name} is online.")
+                else:
+                    _LOGGER.warning(f"Device {self.device.name} is offline.")
 
-        # Store the last state for future comparisons
-        self._last_state = state
+            # Store the last state for future comparisons
+            self._last_state = state
+
+        if self.entity_description.value_fn is not None:
+            return bool(self.entity_description.value_fn(state))
 
         # Return the state, ensuring it's a boolean
         return bool(state)
@@ -302,6 +314,9 @@ DEVICE_BINARY_SENSOR_MAP: dict[type[Device], list[PetLibroBinarySensorEntityDesc
             translation_key="child_lock_switch",
             icon="mdi:lock",
             device_class=BinarySensorDeviceClass.LOCK,
+            # childLockSwitch is True when the lock is engaged; LOCK reports
+            # on == unlocked, so invert here rather than lying in the property.
+            value_fn=lambda state: not state,
             should_report=lambda device: device.child_lock_switch is not None,
             name="Buttons Lock"
         ),

@@ -169,6 +169,13 @@ DEFAULT_FEED = Unit.CUPS
 DEFAULT_WATER = Unit.WATER_OUNCES
 MAX_FEED_PORTIONS = 48
 MANUAL_FEED_PORTIONS = "manual_feed_portions"
+
+# How close a scheduled feeding must be for "skip next feeding" to act on it.
+# Without a bound, the skip walks forward to whatever plan is next -- so removing
+# a morning plan silently redirects the skip onto an unrelated evening meal.
+DEFAULT_SKIP_WINDOW_MINUTES = 90
+MIN_SKIP_WINDOW_MINUTES = 0
+MAX_SKIP_WINDOW_MINUTES = 720
 VALID_UNIT_TYPES: dict[str, set[Unit]] = {
     APIKey.WEIGHT_UNIT: {Unit.POUNDS, Unit.KILOGRAMS, None},
     APIKey.FEED_UNIT: {Unit.CUPS, Unit.OUNCES, Unit.GRAMS, Unit.MILLILITERS, None},

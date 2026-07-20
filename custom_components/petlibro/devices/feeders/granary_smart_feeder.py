@@ -5,12 +5,13 @@ from logging import getLogger
 from ...exceptions import PetLibroAPIError
 from ...const import MAX_FEED_PORTIONS
 from ..device import Device
+from .feeding_plan import FeedingPlanSkipMixin
 from datetime import datetime
 from homeassistant.util import dt as dt_util
 
 _LOGGER = getLogger(__name__)
 
-class GranarySmartFeeder(Device):  # Inherit directly from Device
+class GranarySmartFeeder(FeedingPlanSkipMixin, Device):
     def __init__(self, *args, **kwargs):
         """Initialize the feeder with default values."""
         super().__init__(*args, **kwargs)
@@ -385,7 +386,9 @@ class GranarySmartFeeder(Device):  # Inherit directly from Device
     async def set_desiccant_cycle(self, value: float) -> None:
         _LOGGER.debug(f"Setting desiccant frequency to {value} for {self.serial}")
         try:
-            await self.api.set_desiccant_cycle(self.serial, value)
+            # PetLibroAPI.set_desiccant_cycle requires the maintenance key; it was
+            # omitted here, so every call raised TypeError.
+            await self.api.set_desiccant_cycle(self.serial, value, "DESSICANT")
             await self.refresh()  # Refresh the state after the action
         except aiohttp.ClientError as err:
             _LOGGER.error(f"Failed to set desiccant cycle for {self.serial}: {err}")

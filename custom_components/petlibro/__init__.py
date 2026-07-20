@@ -4,6 +4,7 @@ from datetime import timedelta  # For managing the update interval
 from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed  # For coordinator and update handling
 from .devices import Device
@@ -203,15 +204,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.info(f"Successfully set up PetLibro integration for {email}")
         return True
 
+    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
+        # Both are HomeAssistantError subclasses, so the previous blanket
+        # `except Exception` swallowed them and turned a retryable outage (or an
+        # expired token) into a permanent SETUP_ERROR with no backoff and no
+        # reauth prompt. They must reach Home Assistant untouched.
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+        raise
+
     except Exception as err:
         _LOGGER.error(f"Failed to set up PetLibro integration: {err}", exc_info=True)
-        return False
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+        raise ConfigEntryNotReady(f"Failed to set up PetLibro integration: {err}") from err
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Get the hub from Home Assistant's domain data
-    hub = hass.data[DOMAIN].pop(entry.entry_id, None)
+    # Look the hub up without removing it: if the platform unload fails below,
+    # HA keeps the entry loaded, and popping early left every later
+    # hass.data[DOMAIN][entry_id] lookup (including the options flow) raising.
+    hub = hass.data.get(DOMAIN, {}).get(entry.entry_id)
 
     if hub is None:
         _LOGGER.warning(f"PetLibro hub for entry {entry.entry_id} not found.")
@@ -221,6 +233,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
         _LOGGER.info(f"Successfully unloaded PetLibro entry for {entry.data.get(CONF_EMAIL)}")
         await hub.async_unload()  # If you have any cleanup to do in the hub
     else:

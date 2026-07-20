@@ -4,13 +4,14 @@ from typing import cast
 from logging import getLogger
 from ...exceptions import PetLibroAPIError
 from ..device import Device
+from .feeding_plan import FeedingPlanSkipMixin
 from datetime import datetime
 from homeassistant.util import dt as dt_util
 from ...const import MAX_FEED_PORTIONS
 
 _LOGGER = getLogger(__name__)
 
-class AirSmartFeeder(Device):  # Inherit directly from Device
+class AirSmartFeeder(FeedingPlanSkipMixin, Device):
     def __init__(self, *args, **kwargs):
         """Initialize the feeder with default values."""
         super().__init__(*args, **kwargs)
