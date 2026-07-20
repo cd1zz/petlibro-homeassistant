@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_REGION, CONF_API_TOKEN, Platform
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.components.sensor.const import SensorDeviceClass
 from aiohttp import ClientResponseError, ClientConnectorError
@@ -116,8 +117,13 @@ class PetLibroHub:
                 self.last_refresh_times[device_sn] = datetime.utcnow()  # Set the last refresh time to now
 
             _LOGGER.debug(f"Final devices loaded: {len(self.devices)} devices")
+        except ConfigEntryAuthFailed:
+            raise
         except Exception as ex:
+            # Swallowing this produced a successfully-set-up entry with zero
+            # devices; raise so HA retries setup with backoff instead.
             _LOGGER.error(f"Error while loading devices: {ex}", exc_info=True)
+            raise ConfigEntryNotReady(f"Error while loading devices: {ex}") from ex
 
     async def load_member(self) -> None:
         """Load Petlibro account from the API and initialize it."""
@@ -128,18 +134,22 @@ class PetLibroHub:
 
         try:
             member_info = await self.api.member_info()
-        except Exception:
+        except ConfigEntryAuthFailed:
+            raise
+        except Exception as ex:
+            # A missing member breaks entity setup downstream (unit selection
+            # dereferences hub.member), so fail setup rather than half-load.
             _LOGGER.exception("Error fetching member info.")
-            return
+            raise ConfigEntryNotReady(f"Error fetching member info: {ex}") from ex
 
         if not member_info:
-            _LOGGER.error("API returned empty member info.")
-            return
+            raise ConfigEntryNotReady("API returned empty member info.")
 
         member_email = member_info.get("email")
         if not member_email:
-            _LOGGER.error("API returned member info without an email: %s", member_info)
-            return
+            raise ConfigEntryNotReady(
+                f"API returned member info without an email: {member_info}"
+            )
 
         # Create the member object.
         self.member = Member(member_info, self.api)
@@ -155,8 +165,10 @@ class PetLibroHub:
         """Refresh all known devices and member info from the PETLIBRO API."""
 
         if not self.devices and not self.member:
-            _LOGGER.error("No devices or member to refresh.")
-            return False
+            # Returning False here let async_config_entry_first_refresh() succeed,
+            # producing a "loaded" entry with no entities and no way back short of
+            # a manual reload.
+            raise UpdateFailed("No devices or member to refresh.")
         if not self.devices:
             _LOGGER.warning("No devices to refresh.")
         if not self.member:
@@ -184,14 +196,24 @@ class PetLibroHub:
         results = await asyncio.gather(*refresh_tasks, return_exceptions=True)
 
         failures = 0
+        auth_failure: ConfigEntryAuthFailed | None = None
         for obj, result in zip(data_objects, results):  # noqa: B905
             identifier = getattr(obj, "email", None) or getattr(obj, "serial", "unknown")
             obj_type = "member" if isinstance(obj, Member) else "device"
             if isinstance(result, Exception):
                 _LOGGER.error("Failed to refresh %s (%s): %s", obj_type, identifier, result)
                 failures += 1
+                if isinstance(result, ConfigEntryAuthFailed) and auth_failure is None:
+                    auth_failure = result
             else:
                 _LOGGER.debug("Refreshed %s successfully if needed: %s", obj_type, identifier)
+
+        # gather(return_exceptions=True) turns every failure into a value, which
+        # previously demoted auth failures to a plain counter and re-raised them
+        # as UpdateFailed. Home Assistant only opens the reauth dialog when
+        # ConfigEntryAuthFailed escapes the coordinator, so re-raise it intact.
+        if auth_failure is not None:
+            raise auth_failure
 
         if failures >= len(data_objects):
             raise UpdateFailed("All refresh operations failed.")

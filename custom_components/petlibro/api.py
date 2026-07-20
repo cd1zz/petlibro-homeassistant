@@ -19,10 +19,12 @@ from typing import Any, Dict, List, TypeAlias
 from datetime import datetime, timedelta
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from .exceptions import PetLibroAPIError, PetLibroInvalidAuth
+from .exceptions import PetLibroAPIError, PetLibroCannotConnect, PetLibroInvalidAuth
 from aiohttp import ClientSession, ClientError
 
+import asyncio
 import aiohttp
+import json
 import uuid  # To generate unique request IDs
 
 async def make_api_call(session, url, data):
@@ -42,6 +44,9 @@ class PetLibroSession:
         self.email = email
         self.password = password
         self.region = region
+        # Serialises re-login so a token expiry seen by N concurrent requests
+        # results in one login call, not N.
+        self._relogin_lock = asyncio.Lock()
         self.headers = {
             "source": "ANDROID",
             "language": "EN",
@@ -88,38 +93,85 @@ class PetLibroSession:
             _LOGGER.warning("No token available for request. Attempting to log in...")
 
         # Send the request
-        async with self.websession.request(method, joined_url, **kwargs) as resp:
-            _LOGGER.debug(f"Received response status: {resp.status}")
-            try:
-                data = await resp.json()
-            except Exception as e:
-                raise PetLibroAPIError(f"Error parsing response JSON: {e}")
+        token_used = self.token
+        try:
+            async with self.websession.request(method, joined_url, **kwargs) as resp:
+                data = self._parse_response(resp.status, await resp.read(), joined_url)
+        except aiohttp.ClientError as err:
+            raise PetLibroCannotConnect(f"Request to {joined_url} failed: {err}") from err
 
-            _LOGGER.debug(f"Response data: {data}")
-
-            if resp.status != 200:
-                raise PetLibroAPIError(f"Request failed with status: {resp.status}")
-
-            if data.get("code") == 1009:  # NOT_YET_LOGIN error code
-                _LOGGER.debug(f"NOT_YET_LOGIN error occurred for {joined_url}. Trying re-login.")
-                # Trigger a re-login and get the new token
-                new_token = await self.re_login()
-                kwargs["headers"]["token"] = new_token
-                _LOGGER.debug(f"Retrying request with new token: {new_token}")
-
-                # Retry the request with the new token
-                async with self.websession.request(method, joined_url, **kwargs) as retry_resp:
-                    retry_data = await retry_resp.json()
-                    _LOGGER.debug(f"Retry response: {retry_data}")
-                    return retry_data.get("data")
-
-            if data.get("code") != 0:
-                raise PetLibroAPIError(f"Code: {data.get('code')}, Message: {data.get('msg')}")
-
+        if data.get("code") != 1009:  # 1009 == NOT_YET_LOGIN
+            self._raise_for_code(data, joined_url)
             return data.get("data")
 
-    async def re_login(self) -> str:
-        """Re-login to get a new token when the old one expires."""
+        _LOGGER.debug(f"NOT_YET_LOGIN error occurred for {joined_url}. Trying re-login.")
+        new_token = await self.re_login(stale_token=token_used)
+        kwargs["headers"]["token"] = new_token
+
+        # Retry once with the new token. The retry is validated exactly like the
+        # first attempt -- previously its status and error code were ignored, so a
+        # failed retry silently returned None and callers treated it as real data.
+        try:
+            async with self.websession.request(method, joined_url, **kwargs) as retry_resp:
+                retry_data = self._parse_response(retry_resp.status, await retry_resp.read(), joined_url)
+        except aiohttp.ClientError as err:
+            raise PetLibroCannotConnect(f"Retry of {joined_url} failed: {err}") from err
+
+        if retry_data.get("code") == 1009:
+            # Still unauthenticated with a freshly minted token: the credentials
+            # themselves are no longer valid, so ask HA for reauth.
+            raise ConfigEntryAuthFailed(
+                f"Still unauthenticated after re-login for {joined_url}"
+            )
+
+        self._raise_for_code(retry_data, joined_url)
+        return retry_data.get("data")
+
+    @staticmethod
+    def _parse_response(status: int, body: bytes, url: str) -> dict:
+        """Validate the HTTP status, then decode the JSON envelope."""
+        # Status is checked first: a 502 from a proxy returns an HTML error page,
+        # and decoding that first loses the status code behind a JSON parse error.
+        if status != 200:
+            raise PetLibroAPIError(f"Request to {url} failed with status: {status}")
+
+        try:
+            data = json.loads(body)
+        except ValueError as err:
+            raise PetLibroAPIError(f"Error parsing response JSON from {url}: {err}") from err
+
+        _LOGGER.debug(f"Response data: {data}")
+
+        if not isinstance(data, dict):
+            raise PetLibroAPIError(
+                f"Unexpected response shape from {url}: expected object, got {type(data).__name__}"
+            )
+
+        return data
+
+    @staticmethod
+    def _raise_for_code(data: dict, url: str) -> None:
+        """Raise if the API envelope reports a non-success code."""
+        code = data.get("code")
+        if code != 0:
+            raise PetLibroAPIError(f"Code: {code}, Message: {data.get('msg')} ({url})")
+
+    async def re_login(self, stale_token: str | None = None) -> str:
+        """Re-login to get a new token when the old one expires.
+
+        Serialised behind a lock: a token expiry is seen simultaneously by every
+        in-flight request, and without this each one issued its own login call.
+        Callers pass the token they actually used, so whoever loses the race
+        simply picks up the token the winner already fetched.
+        """
+        async with self._relogin_lock:
+            if stale_token is not None and self.token != stale_token:
+                _LOGGER.debug("Token was already refreshed by another request; reusing it.")
+                return self.token
+            return await self._do_login()
+
+    async def _do_login(self) -> str:
+        """Perform the actual login call. Caller must hold _relogin_lock."""
         try:
             _LOGGER.debug(f"Attempting re-login with email: {self.email} and region: {self.region}")
 
@@ -141,17 +193,26 @@ class PetLibroSession:
             ) as response:
                 _LOGGER.debug(f"Re-login response status: {response.status}")
 
-                if response.status != 200:
-                    raise PetLibroAPIError(f"Failed to login, status: {response.status}")
+                response_data = self._parse_response(
+                    response.status, await response.read(), "/member/auth/login"
+                )
 
-                response_data = await response.json()
-                _LOGGER.debug(f"Re-login response data: {response_data}")
+                # A rejected login returns {"code": <non-zero>, "data": null}. The
+                # previous check did `"token" not in data.get("data", {})`, which
+                # returns the default only when the key is *absent* -- with an
+                # explicit null it evaluated `in None` and raised TypeError,
+                # masking the real "bad credentials" cause.
+                code = response_data.get("code")
+                if code != 0:
+                    raise ConfigEntryAuthFailed(
+                        f"Login rejected (code {code}): {response_data.get('msg')}"
+                    )
 
-                if not isinstance(response_data, dict) or "token" not in response_data.get("data", {}):
-                    raise PetLibroAPIError("Token not found during login.")
+                payload = response_data.get("data")
+                if not isinstance(payload, dict) or not payload.get("token"):
+                    raise ConfigEntryAuthFailed("Token not found in login response.")
 
-                # Get the new token from response data
-                new_token = response_data["data"]["token"]
+                new_token = payload["token"]
                 self.token = new_token  # Update the session token
 
                 # Save the new token in the config entry
@@ -164,13 +225,24 @@ class PetLibroSession:
 
                 return new_token
 
+        except ConfigEntryAuthFailed:
+            # A genuine credential rejection -- must reach HA so it can start the
+            # reauth flow. Do not downgrade it to a transient error.
+            raise
+
         except aiohttp.ClientError as e:
+            # The network is down, not the credentials. Reporting this as an auth
+            # failure would pop a bogus "re-enter your password" prompt instead of
+            # letting HA retry with backoff.
             _LOGGER.error(f"Re-login failed due to a client error: {e}")
-            raise ConfigEntryAuthFailed(f"Client error during re-login: {e}") from e
+            raise PetLibroCannotConnect(f"Client error during re-login: {e}") from e
+
+        except PetLibroAPIError:
+            raise
 
         except Exception as e:
             _LOGGER.error(f"Re-login attempt failed due to an unexpected error: {e}")
-            raise ConfigEntryAuthFailed(f"Unexpected error during re-login: {e}") from e
+            raise PetLibroAPIError(f"Unexpected error during re-login: {e}") from e
 
 class PetLibroAPI:
     """PetLibro API class"""
@@ -229,15 +301,26 @@ class PetLibroAPI:
 
             if not isinstance(data, dict) or "token" not in data or not isinstance(data["token"], str):
                 _LOGGER.error("No token found during login. Response data: %s", data)
-                raise PetLibroAPIError("No token found during login.")
+                raise PetLibroInvalidAuth("No token found during login.")
 
             self.session.token = data["token"]
             _LOGGER.debug(f"Login successful, token: {self.session.token}")
             return self.session.token
 
+        except (PetLibroCannotConnect, PetLibroInvalidAuth):
+            # Keep these distinct so the config flow can tell "wrong password"
+            # from "network unreachable" and show the right error.
+            raise
+
+        except PetLibroAPIError as e:
+            # Any other non-zero code from the login endpoint itself means the
+            # credentials were rejected.
+            _LOGGER.error(f"Login failed: {e}")
+            raise PetLibroInvalidAuth(f"Login attempt failed: {e}") from e
+
         except Exception as e:
             _LOGGER.error(f"Login failed: {e}")
-            raise PetLibroAPIError(f"Login attempt failed: {e}")
+            raise PetLibroAPIError(f"Login attempt failed: {e}") from e
 
     async def get_device_real_info(self, device_id: str) -> dict:
         """Fetch real-time information for a device, with caching to prevent frequent requests."""
