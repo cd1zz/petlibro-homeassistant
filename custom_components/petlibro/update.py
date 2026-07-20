@@ -43,11 +43,9 @@ class PetLibroUpdateEntity(PetLibroEntity[_DeviceT], UpdateEntity):
     def __init__(self, device, hub, description):
         super().__init__(device, hub, description)
 
-        mac_address = getattr(device, "mac", None)
-        if mac_address:
-            self._attr_unique_id = f"{device.serial}-{description.key}-{mac_address.replace(':', '')}"
-        else:
-            self._attr_unique_id = f"{device.serial}-{description.key}"
+        # See sensor.py: the MAC suffix came from polled data and could appear
+        # or vanish between restarts, registering a duplicate entity.
+        self._attr_unique_id = f"{device.serial}-{description.key}"
 
         self._attr_device_class = UpdateDeviceClass.FIRMWARE
         self._attr_supported_features = (

@@ -51,8 +51,15 @@ class Member(Event):
 
     @property
     def entity_id(self) -> str:
-        """Entity ID."""
-        return f"PL-{self._data.get(API.ID, API.EMAIL)}-data"
+        """Stable identifier for the member entity (used as its unique_id).
+
+        The fallback used to be the APIKey.EMAIL enum *member*, which is the
+        string "email" -- so any account whose payload lacked an id produced the
+        literal unique_id "PL-email-data", colliding across accounts. Fall back
+        to the address itself.
+        """
+        identifier = self._data.get(API.ID) or self._data.get(API.EMAIL)
+        return f"PL-{identifier}-data"
 
 
     @property

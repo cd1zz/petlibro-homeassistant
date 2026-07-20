@@ -1,10 +1,12 @@
 import logging
+import re
 
 from datetime import timedelta  # For managing the update interval
 from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed  # For coordinator and update handling
 from .devices import Device
@@ -23,6 +25,55 @@ from .const import DOMAIN, CONF_EMAIL, CONF_PASSWORD, PLATFORMS, UPDATE_INTERVAL
 from .hub import PetLibroHub
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# Matches a unique_id whose last segment is a bare 12-hex-digit MAC, e.g.
+# "AF03013D9201C5361-device_sn-7822884056DC".
+_MAC_SUFFIX_RE = re.compile(r"^(?P<base>.+)-(?P<mac>[0-9A-Fa-f]{12})$")
+
+
+async def _async_migrate_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Strip the MAC suffix from unique_ids written by earlier versions.
+
+    Sensor and update entities used to append the device MAC. Because the MAC
+    comes from polled data it could be absent on one startup and present on the
+    next, registering a second entity and orphaning the first. Rewriting the
+    registry in place keeps history, customisations and dashboard references
+    attached instead of stranding them under the old id.
+    """
+    registry = er.async_get(hass)
+    entries = er.async_entries_for_config_entry(registry, entry.entry_id)
+    taken = {e.unique_id for e in entries}
+    migrated = 0
+
+    for existing in entries:
+        unique_id = existing.unique_id or ""
+        match = _MAC_SUFFIX_RE.match(unique_id)
+        if not match:
+            continue
+
+        base = match.group("base")
+        # Guard against a key that merely looks like hex: the remainder must
+        # still be "<serial>-<key>".
+        if "-" not in base:
+            continue
+        if base in taken:
+            _LOGGER.warning(
+                "Cannot migrate %s (%s -> %s): target unique_id already exists",
+                existing.entity_id, unique_id, base,
+            )
+            continue
+
+        _LOGGER.info(
+            "Migrating unique_id for %s: %s -> %s", existing.entity_id, unique_id, base
+        )
+        registry.async_update_entity(existing.entity_id, new_unique_id=base)
+        taken.discard(unique_id)
+        taken.add(base)
+        migrated += 1
+
+    if migrated:
+        _LOGGER.info("Migrated %d PetLibro unique_id(s) off the MAC suffix", migrated)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -182,6 +233,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Store the hub in hass.data
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
 
+        # Rewrite legacy MAC-suffixed unique_ids before any platform registers
+        # entities, so the existing registry rows are reused rather than
+        # duplicated.
+        await _async_migrate_unique_ids(hass, entry)
+
         # Load member only once here
         await hub.load_member()
 
@@ -236,6 +292,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
         _LOGGER.info(f"Successfully unloaded PetLibro entry for {entry.data.get(CONF_EMAIL)}")
         await hub.async_unload()  # If you have any cleanup to do in the hub
+
+        # Services are registered once for the whole domain, so only tear them
+        # down when the last entry goes away. Previously they were never
+        # removed and calling them after removal raised KeyError.
+        if not hass.data.get(DOMAIN):
+            from .services import async_unload_services
+            async_unload_services(hass)
     else:
         _LOGGER.error(f"Failed to unload PetLibro entry for {entry.data.get(CONF_EMAIL)}")
 

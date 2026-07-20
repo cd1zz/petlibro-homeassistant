@@ -65,13 +65,18 @@ class PetLibroHub:
         _LOGGER.debug(f"Initializing PetLibroAPI with email: {email}, region: {region}")
 
         # Initialize the PetLibro API instance
+        # hass and config_entry must be passed for the refreshed token to be
+        # persisted; without them the save path in PetLibroSession.re_login was
+        # unreachable and every restart began with a stale token.
         self.api = PetLibroAPI(
             async_get_clientsession(hass),
             hass.config.time_zone,
             region,
             email,
             password,
-            self.entry.data.get(CONF_API_TOKEN)
+            self.entry.data.get(CONF_API_TOKEN),
+            config_entry=self.entry,
+            hass=hass,
         )
 
         # Setup DataUpdateCoordinator to periodically refresh device data
