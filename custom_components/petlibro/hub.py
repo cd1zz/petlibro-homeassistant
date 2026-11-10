@@ -201,10 +201,15 @@ class PetLibroHub:
         results = await asyncio.gather(*refresh_tasks, return_exceptions=True)
 
         failures = 0
+        attempted = 0
         auth_failure: ConfigEntryAuthFailed | None = None
         for obj, result in zip(data_objects, results):  # noqa: B905
             identifier = getattr(obj, "email", None) or getattr(obj, "serial", "unknown")
             obj_type = "member" if isinstance(obj, Member) else "device"
+            if result is False:
+                # Skipped (refreshed recently): neither a success nor a failure.
+                continue
+            attempted += 1
             if isinstance(result, Exception):
                 _LOGGER.error("Failed to refresh %s (%s): %s", obj_type, identifier, result)
                 failures += 1
@@ -220,7 +225,9 @@ class PetLibroHub:
         if auth_failure is not None:
             raise auth_failure
 
-        if failures >= len(data_objects):
+        # Only objects actually refreshed count: the member is skipped for 6h
+        # at a time and used to mask a full outage as a partial one.
+        if attempted and failures >= attempted:
             raise UpdateFailed("All refresh operations failed.")
 
         if failures:
@@ -235,8 +242,11 @@ class PetLibroHub:
         *,
         device: Device | None = None,
         member: Member | None = None,
-    ) -> None:
-        """Refresh a device or member info only if enough time has passed."""
+    ) -> bool:
+        """Refresh a device or member info only if enough time has passed.
+
+        Returns False when the refresh was skipped, True when it ran.
+        """
 
         is_member = member is not None
         obj = member if is_member else device
@@ -257,17 +267,22 @@ class PetLibroHub:
                     identifier,
                     last_refresh,
                 )
-                return
+                return False
             _LOGGER.debug("Member was updated recently, waiting 5s..")
             await asyncio.sleep(5)
 
         try:
             _LOGGER.debug("Refreshing %s: %s", obj_type_str, identifier)
-            await obj.refresh()
+            if is_member:
+                await obj.refresh()
+            else:
+                # poll() raises on failures that refresh() only logs.
+                await obj.poll()
             if is_member:
                 self.member.force_refresh = False
             self.last_refresh_times[identifier] = now
             _LOGGER.debug("Refresh complete for %s: %s", obj_type_str, identifier)
+            return True
         except Exception:
             _LOGGER.exception("Error refreshing %s: %s", obj_type_str, identifier)
             raise
