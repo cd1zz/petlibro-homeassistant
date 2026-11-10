@@ -20,6 +20,11 @@ class Device(Event):
         self._data: dict = {}
         self.api = api
         self.member = member
+        # Outcome of the last coordinator poll. refresh() itself never raises
+        # for API errors (dozens of setters call it after a successful
+        # command), so failures are recorded here and surfaced by poll().
+        self.last_poll_ok: bool = True
+        self._refresh_error: Exception | None = None
 
         self.update_data(data)
 
@@ -53,6 +58,32 @@ class Device(Event):
             raise
         except Exception as e:
             _LOGGER.error(f"Failed to refresh device data: {e}")
+            self._record_refresh_error(e)
+
+    def _record_refresh_error(self, err: Exception) -> None:
+        """Remember a refresh failure so poll() can report it."""
+        self._refresh_error = err
+
+    async def poll(self) -> None:
+        """Refresh for the coordinator, raising if the refresh failed.
+
+        Subclass refresh() handlers log and swallow PetLibroAPIError, which
+        used to make a cloud outage look like a successful poll: entities
+        stayed available with frozen values. poll() re-raises the recorded
+        error so the hub can count the failure and entities can go
+        unavailable.
+        """
+        self._refresh_error = None
+        try:
+            await self.refresh()
+        except Exception:
+            self.last_poll_ok = False
+            raise
+        err, self._refresh_error = self._refresh_error, None
+        if err is not None:
+            self.last_poll_ok = False
+            raise err
+        self.last_poll_ok = True
 
     @property
     def serial(self) -> str:

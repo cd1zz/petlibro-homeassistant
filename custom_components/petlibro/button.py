@@ -11,6 +11,7 @@ from .const import DOMAIN
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry  # Added ConfigEntry import
 from .hub import PetLibroHub  # Adjust the import path as necessary
@@ -515,6 +516,9 @@ class PetLibroButtonEntity(PetLibroEntity[_DeviceT], ButtonEntity):
                 f"Error pressing button {self.entity_description.name} for device {self.device.name}: {e}",
                 exc_info=True  # Log full traceback for better debugging
             )
+            raise HomeAssistantError(
+                f"Failed to press {self.entity_description.key} for {self.device.name}: {e}"
+            ) from e
 
 async def async_setup_entry(
     hass: HomeAssistant,

@@ -39,6 +39,7 @@ class Dockstream2SmartCordlessFountain(Device):
 
         except PetLibroAPIError as err:
             _LOGGER.error(f"Error refreshing data for Dockstream2SmartCordlessFountain: {err}")
+            self._record_refresh_error(err)
 
     @property
     def available(self) -> bool:

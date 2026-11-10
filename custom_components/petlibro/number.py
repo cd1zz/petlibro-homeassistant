@@ -23,6 +23,7 @@ from homeassistant.components.number import (
 )
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import UnitOfVolume, Platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry  # Added ConfigEntry import
@@ -107,6 +108,9 @@ class PetLibroNumberEntity(PetLibroEntity[_DeviceT], NumberEntity):
             _LOGGER.debug(f"Value {value} set successfully for {self.device.name}")
         except Exception as e:
             _LOGGER.error(f"Error setting value {value} for {self.device.name}: {e}")
+            raise HomeAssistantError(
+                f"Failed to set {self.entity_description.key} for {self.device.name}: {e}"
+            ) from e
 
     @property
     def native_unit_of_measurement(self) -> str | None:

@@ -17,6 +17,7 @@ from homeassistant.components.text import (
     TextEntityDescription,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry  # Added ConfigEntry import
 from .hub import PetLibroHub  # Adjust the import path as necessary
@@ -65,12 +66,13 @@ class PetLibroTextEntity(PetLibroEntity[_DeviceT], TextEntity):
             uppercase_value = native_value.upper()
             _LOGGER.debug(f"Calling method with value={uppercase_value} for {self.device.name}")
             await self.device.set_display_text(uppercase_value)
-            # Update value in HA to uppercase as well
-            self.device.display_text = uppercase_value
             _LOGGER.debug(f"Original: {native_value}, Uppercased: {uppercase_value} for {self.device.name}")
             self.async_write_ha_state()
         except Exception as e:
             _LOGGER.error(f"Error setting value {native_value} for {self.device.name}: {e}")
+            raise HomeAssistantError(
+                f"Failed to set {self.entity_description.key} for {self.device.name}: {e}"
+            ) from e
 
 DEVICE_TEXT_MAP: dict[type[Device], list[PetLibroTextEntityDescription]] = {
     Feeder: [

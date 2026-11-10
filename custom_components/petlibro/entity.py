@@ -48,6 +48,11 @@ class PetLibroEntity(
             hw_version=self.device.hardware_version
         )
 
+    @property
+    def available(self) -> bool:
+        """Unavailable when the hub or this device's last poll failed."""
+        return super().available and getattr(self.device, "last_poll_ok", True)
+
     async def async_added_to_hass(self) -> None:
         """Set up a listener for the entity."""
         await super().async_added_to_hass()

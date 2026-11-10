@@ -353,9 +353,12 @@ class PetLibroAPI:
             self._cached_responses[f"{device_id}_realInfo"] = response
 
             return response
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching realInfo for device {device_id}: {e}")
-            raise PetLibroAPIError(f"Error fetching realInfo for device {device_id}: {e}")
+            raise PetLibroAPIError(f"Error fetching realInfo for device {device_id}: {e}") from e
 
     async def get_device_data_real_info(self, device_id: str) -> dict:
         """Fetch real-time information for a device, with caching to prevent frequent requests."""
@@ -379,9 +382,12 @@ class PetLibroAPI:
             self._cached_responses[f"{device_id}_dataRealInfo"] = response
 
             return response
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching _dataRealInfo for device {device_id}: {e}")
-            raise PetLibroAPIError(f"Error fetching _dataRealInfo for device {device_id}: {e}")
+            raise PetLibroAPIError(f"Error fetching _dataRealInfo for device {device_id}: {e}") from e
 
     async def get_device_drink_water(self, device_id: str) -> dict:
         """Fetch real-time information for a device, with caching to prevent frequent requests."""
@@ -405,9 +411,12 @@ class PetLibroAPI:
             self._cached_responses[f"{device_id}_drinkWater"] = response
 
             return response
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching _drinkWater for device {device_id}: {e}")
-            raise PetLibroAPIError(f"Error fetching _drinkWater for device {device_id}: {e}")
+            raise PetLibroAPIError(f"Error fetching _drinkWater for device {device_id}: {e}") from e
 
     async def get_device_attribute_settings(self, device_id: str) -> dict:
         """Fetch real-time information for a device, with caching to prevent frequent requests."""
@@ -430,9 +439,12 @@ class PetLibroAPI:
             self._cached_responses[f"{device_id}_getAttributeSetting"] = response
 
             return response
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching getAttributeSetting for device {device_id}: {e}")
-            raise PetLibroAPIError(f"Error fetching getAttributeSetting for device {device_id}: {e}")
+            raise PetLibroAPIError(f"Error fetching getAttributeSetting for device {device_id}: {e}") from e
 
     async def get_device_upgrade(self, device_id: str) -> dict:
         """Fetch real-time information for a device, with caching to prevent frequent requests."""
@@ -455,9 +467,12 @@ class PetLibroAPI:
             self._cached_responses[f"{device_id}_getUpgrade"] = response
 
             return response
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching getUpgrade for device {device_id}: {e}")
-            raise PetLibroAPIError(f"Error fetching getUpgrade for device {device_id}: {e}")
+            raise PetLibroAPIError(f"Error fetching getUpgrade for device {device_id}: {e}") from e
 
     async def get_device_base_info(self, device_id: str) -> dict:
         """Fetch real-time information for a device, with caching to prevent frequent requests."""
@@ -480,9 +495,12 @@ class PetLibroAPI:
             self._cached_responses[f"{device_id}_baseInfo"] = response
 
             return response
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching baseInfo for device {device_id}: {e}")
-            raise PetLibroAPIError(f"Error fetching baseInfo for device {device_id}: {e}")
+            raise PetLibroAPIError(f"Error fetching baseInfo for device {device_id}: {e}") from e
 
     async def get_device_work_record(self, device_id: str) -> dict:
         """Fetch real-time information for a device, with caching to prevent frequent requests."""
@@ -517,9 +535,12 @@ class PetLibroAPI:
 
             return response_data
 
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching workRecord for device {device_id}: {e}")
-            raise PetLibroAPIError(f"Error fetching workRecord for device {device_id}: {e}")
+            raise PetLibroAPIError(f"Error fetching workRecord for device {device_id}: {e}") from e
 
     async def get_device_events(self, device_id: str) -> dict:
         """Fetch real-time information for a device, with caching to prevent frequent requests."""
@@ -542,9 +563,12 @@ class PetLibroAPI:
             self._cached_responses[f"{device_id}_events"] = response
 
             return response
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching deviceEvents for device {device_id}: {e}")
-            raise PetLibroAPIError(f"Error fetching deviceEvents for device {device_id}: {e}")
+            raise PetLibroAPIError(f"Error fetching deviceEvents for device {device_id}: {e}") from e
 
     async def get_default_matrix(self, device_sn: str) -> dict:
         """
@@ -580,9 +604,12 @@ class PetLibroAPI:
             self._last_api_call_times[cache_key] = now
             self._cached_responses[cache_key] = response
             return response
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Keep auth failures (reauth) and connection errors intact.
+            raise
         except Exception as e:
             _LOGGER.error(f"Error fetching default matrix for device {device_sn}: {e}")
-            raise PetLibroAPIError(f"Failed to fetch default matrix: {e}")
+            raise PetLibroAPIError(f"Failed to fetch default matrix: {e}") from e
 
     async def logout(self):
         """Logout of the API and reset the token"""
@@ -1403,6 +1430,10 @@ class PetLibroAPI:
 
         try:
             data = await self.session.post("/member/member/info", json={})
+        except (ConfigEntryAuthFailed, PetLibroAPIError):
+            # Wrapping ConfigEntryAuthFailed here turned a bad password into an
+            # endless ConfigEntryNotReady retry loop instead of a reauth prompt.
+            raise
         except Exception as exc:
             _LOGGER.exception("Failed to fetch member information")
             raise PetLibroAPIError("Failed to fetch member information") from exc
